@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, BookOpen, Library, ArrowUpDown } from 'lucide-react';
+import { Search, Library } from 'lucide-react';
 import { BookCard } from './BookCard';
 
 export function LibraryView({ books, onViewBook, onDeleteBook }) {

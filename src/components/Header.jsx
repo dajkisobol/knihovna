@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, X, Key, Save, Check } from 'lucide-react';
+import { X, Key, Save, Check } from 'lucide-react';
 
 export function Header({ onOpenScanner, onOpenManual, openAiKey, onSaveSettings }) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
