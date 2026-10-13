@@ -304,25 +304,34 @@ export async function fetchBookByIsbn(rawIsbn) {
 /**
  * Enrich book summary and main ideas with OpenAI if an API key is provided
  */
-export async function enrichBookWithOpenAI(book, apiKey) {
+export async function enrichBookWithOpenAI(book, apiKey, customPrompt = '') {
   if (!apiKey || !apiKey.trim()) {
     return book;
   }
 
   try {
-    const prompt = `Kniha: "${book.title}" od "${book.authors}".
+    const basePrompt = `Kniha: "${book.title}" od "${book.authors}".
 Žánr: ${book.genre || 'Nespecifikován'}.
+Nakladatel: ${book.publisher || 'Není uveden'}. Rok: ${book.publishedDate || 'Není uveden'}. ČNB: ${book.cnb || 'Není uvedeno'}.
 Existující popis/poznámka: "${book.description}".
 
-Úkol: Napiš stručné a výstižné shrnutí děje v češtině (2-4 věty) a výčet 3 až 5 hlavních myšlenek / poselství této knihy v češtině.
+Úkol: Vytvoř detailní a poutavý literární rozbor v češtině.
+1. Napiš výstižné shrnutí děje v češtině (3-5 vět).
+2. Výčet 3 až 5 hlavních myšlenek / poselství.
+3. Přidej doporučení, pro jakého čtenáře se kniha hodí.
+4. Přidej stručný popis postav nebo kontextu autora.
+${customPrompt ? `Doplňující požadavek od uživatele: "${customPrompt}"` : ''}
+
 Odpověz výhradně ve formátu JSON:
 {
-  "summary": "Stručné shrnutí děje v češtině...",
+  "summary": "Detailní shrnutí děje v češtině...",
   "mainIdeas": [
     "První hlavní myšlenka...",
     "Druhá hlavní myšlenka...",
     "Třetí hlavní myšlenka..."
-  ]
+  ],
+  "recommendation": "Komu knihu doporučujeme...",
+  "characterNotes": "Postavy a kontext díla..."
 }`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -334,8 +343,8 @@ Odpověz výhradně ve formátu JSON:
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'Jsi zkušený literární kritik a knihovník. Tvým úkolem je vytvářet výstižná shrnutí a hlavní myšlenky knih v češtině ve formátu JSON.' },
-          { role: 'user', content: prompt }
+          { role: 'system', content: 'Jsi zkušený literární kritik a knihovník. Tvým úkolem je vytvářet výstižná a podrobná shrnutí knih v češtině ve formátu JSON.' },
+          { role: 'user', content: basePrompt }
         ],
         response_format: { type: 'json_object' },
         temperature: 0.7
@@ -355,6 +364,8 @@ Odpověz výhradně ve formátu JSON:
         ...book,
         description: parsed.summary || book.description,
         mainIdeas: Array.isArray(parsed.mainIdeas) && parsed.mainIdeas.length > 0 ? parsed.mainIdeas : book.mainIdeas,
+        recommendation: parsed.recommendation || book.recommendation || '',
+        characterNotes: parsed.characterNotes || book.characterNotes || '',
         aiEnriched: true
       };
     }

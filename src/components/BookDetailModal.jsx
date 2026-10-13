@@ -13,6 +13,8 @@ export function BookDetailModal({
   const [editedBook, setEditedBook] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [newIdeaText, setNewIdeaText] = useState('');
+  const [customAiPrompt, setCustomAiPrompt] = useState('');
+  const [showAiCustomBox, setShowAiCustomBox] = useState(false);
 
   useEffect(() => {
     if (book) {
@@ -182,30 +184,78 @@ export function BookDetailModal({
           </div>
 
           {/* AI Enrichment Action */}
-          <div className="bg-amber-100/60 border border-amber-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center space-x-2.5">
-              <div className="p-2 bg-amber-300/80 rounded-lg text-amber-900">
-                <Sparkles className="w-4 h-4" />
+          <div className="bg-amber-100/60 border border-amber-200 rounded-xl p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-amber-300/80 rounded-lg text-amber-900">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-stone-900">Interaktivní AI rozbor & podrobnosti</p>
+                  <p className="text-[11px] text-stone-600">
+                    {editedBook.aiEnriched
+                      ? 'Kniha má vygenerovaný AI rozbor, doporučení a postavy'
+                      : 'Vygenerujte české shrnutí, postavy a cílové čtenáře'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-semibold text-stone-900">Detailnější rozbor myšlenek</p>
-                <p className="text-[11px] text-stone-600">
-                  {editedBook.aiEnriched
-                    ? 'Kniha byla rozšířena o AI analýzu děje'
-                    : 'Možnost vygenerovat české shrnutí a hlavní myšlenky'}
-                </p>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAiCustomBox(!showAiCustomBox)}
+                  className="px-2.5 py-1.5 rounded-lg bg-white/80 hover:bg-white text-stone-700 text-xs font-medium border border-amber-200 transition"
+                >
+                  {showAiCustomBox ? 'Skrýt dotaz' : 'Vlastní dotaz AI'}
+                </button>
+                <button
+                  onClick={() => onEnrichAi(editedBook, customAiPrompt)}
+                  disabled={isAiLoading}
+                  className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-amber-950 text-xs font-semibold transition shadow-xs cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{isAiLoading ? 'Generuji...' : 'Spustit AI rozbor'}</span>
+                </button>
               </div>
             </div>
 
-            <button
-              onClick={() => onEnrichAi(editedBook)}
-              disabled={isAiLoading}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-amber-950 text-xs font-semibold transition shadow-xs cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isAiLoading ? 'Generuji...' : 'Rozšířit pomocí AI'}</span>
-            </button>
+            {showAiCustomBox && (
+              <div className="pt-2 border-t border-amber-200/60 space-y-2">
+                <label className="block text-[11px] font-medium text-stone-700">
+                  Zadejte vlastní instrukci pro AI (např. "Zaměř se na historický kontext" nebo "Vysvětli pro děti"):
+                </label>
+                <input
+                  type="text"
+                  value={customAiPrompt}
+                  onChange={(e) => setCustomAiPrompt(e.target.value)}
+                  placeholder="např. Jaké je hlavní poučení z příběhu?"
+                  className="w-full px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+            )}
           </div>
+
+          {/* AI Generated Recommendation & Characters */}
+          {(editedBook.recommendation || editedBook.characterNotes) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {editedBook.recommendation && (
+                <div className="bg-amber-100/40 p-3 rounded-xl border border-amber-200/70 text-xs space-y-1">
+                  <h4 className="font-bold text-amber-950 flex items-center space-x-1">
+                    <span>💡 Pro koho je kniha vhodná</span>
+                  </h4>
+                  <p className="text-stone-700 leading-relaxed">{editedBook.recommendation}</p>
+                </div>
+              )}
+              {editedBook.characterNotes && (
+                <div className="bg-amber-100/40 p-3 rounded-xl border border-amber-200/70 text-xs space-y-1">
+                  <h4 className="font-bold text-amber-950 flex items-center space-x-1">
+                    <span>👥 Postavy & Kontext</span>
+                  </h4>
+                  <p className="text-stone-700 leading-relaxed">{editedBook.characterNotes}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Description Section */}
           <div className="space-y-2">

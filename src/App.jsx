@@ -132,7 +132,7 @@ export default function App() {
   };
 
   // Manual AI enrichment button click inside modal
-  const handleEnrichWithAi = async (bookToEnrich) => {
+  const handleEnrichWithAi = async (bookToEnrich, customPrompt = '') => {
     if (!settings.openAiKey) {
       alert('Pro rozšíření pomocí AI vložte v nastavení (ikona klíče v záhlaví) váš OpenAI API klíč.');
       return;
@@ -140,7 +140,7 @@ export default function App() {
 
     setIsAiLoading(true);
     try {
-      const enriched = await enrichBookWithOpenAI(bookToEnrich, settings.openAiKey);
+      const enriched = await enrichBookWithOpenAI(bookToEnrich, settings.openAiKey, customPrompt);
       setSelectedBook(enriched);
       // If already in library, save changes automatically
       if (books.some((b) => b.isbn === enriched.isbn)) {
