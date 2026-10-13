@@ -4,13 +4,35 @@ import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { ManualIsbnModal } from './components/ManualIsbnModal';
 import { BookDetailModal } from './components/BookDetailModal';
 import { LibraryView } from './components/LibraryView';
+import { CommunityView } from './components/CommunityView';
+import { HistoryView } from './components/HistoryView';
+import { ProfileModal } from './components/ProfileModal';
 import { fetchBookByIsbn, enrichBookWithOpenAI } from './services/bookService';
-import { getSavedBooks, saveBooks, getSettings, saveSettings } from './utils/storage';
+import {
+  getSavedBooks,
+  saveBooks,
+  getSettings,
+  saveSettings,
+  getProfiles,
+  saveProfiles,
+  getActiveProfile,
+  saveActiveProfile,
+  getBrowsingHistory,
+  addBrowsingHistory,
+  clearBrowsingHistory
+} from './utils/storage';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [books, setBooks] = useState([]);
   const [settings, setSettings] = useState({ openAiKey: '' });
+
+  // Profiles & Navigation State
+  const [profiles, setProfiles] = useState([]);
+  const [activeProfile, setActiveProfile] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('library'); // 'library' | 'community' | 'history'
+  const [browsingHistory, setBrowsingHistory] = useState([]);
 
   // Modals state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -27,7 +49,38 @@ export default function App() {
   useEffect(() => {
     setBooks(getSavedBooks());
     setSettings(getSettings());
+    const profs = getProfiles();
+    setProfiles(profs);
+    setActiveProfile(getActiveProfile());
+    setBrowsingHistory(getBrowsingHistory());
   }, []);
+
+  const handleOpenBookDetail = (book) => {
+    setSelectedBook(book);
+    setIsDetailOpen(true);
+    const updatedHistory = addBrowsingHistory(book);
+    setBrowsingHistory(updatedHistory);
+  };
+
+  const handleSwitchProfile = (prof) => {
+    setActiveProfile(prof);
+    saveActiveProfile(prof);
+    setIsProfileModalOpen(false);
+  };
+
+  const handleCreateProfile = (newProf) => {
+    const updated = [...profiles, newProf];
+    setProfiles(updated);
+    saveProfiles(updated);
+    handleSwitchProfile(newProf);
+  };
+
+  const handleClearHistory = () => {
+    if (window.confirm('Opravdu chcete vymazat historii prohlížení?')) {
+      clearBrowsingHistory();
+      setBrowsingHistory([]);
+    }
+  };
 
   const handleSaveSettings = (newKey) => {
     const updated = { ...settings, openAiKey: newKey };
@@ -69,8 +122,7 @@ export default function App() {
         }
       }
 
-      setSelectedBook(fetchedBook);
-      setIsDetailOpen(true);
+      handleOpenBookDetail(fetchedBook);
     } catch (err) {
       console.error('Error fetching ISBN:', err);
       setErrorMessage(err.message || 'Nepodařilo se načíst informace o knize.');
@@ -141,6 +193,10 @@ export default function App() {
         }}
         openAiKey={settings.openAiKey}
         onSaveSettings={handleSaveSettings}
+        activeProfile={activeProfile}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
       />
 
       {/* Main Body */}
@@ -169,16 +225,39 @@ export default function App() {
           </div>
         )}
 
-        {/* Library view with books list */}
-        <LibraryView
-          books={books}
-          onViewBook={(book) => {
-            setSelectedBook(book);
-            setIsDetailOpen(true);
-          }}
-          onDeleteBook={handleDeleteBook}
-        />
+        {/* Views based on Active Tab */}
+        {activeTab === 'library' && (
+          <LibraryView
+            books={books}
+            onViewBook={handleOpenBookDetail}
+            onDeleteBook={handleDeleteBook}
+          />
+        )}
+
+        {activeTab === 'community' && (
+          <CommunityView
+            activeProfile={activeProfile}
+            books={books}
+          />
+        )}
+
+        {activeTab === 'history' && (
+          <HistoryView
+            history={browsingHistory}
+            onViewBook={handleOpenBookDetail}
+            onClearHistory={handleClearHistory}
+          />
+        )}
       </main>
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profiles={profiles}
+        activeProfile={activeProfile}
+        onSwitchProfile={handleSwitchProfile}
+        onCreateProfile={handleCreateProfile}
+      />
 
       {/* Modals */}
       <BarcodeScannerModal
