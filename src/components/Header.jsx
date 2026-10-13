@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
 import { X, Key, Save, Check } from 'lucide-react';
 
-export function Header({ onOpenScanner, onOpenManual, openAiKey, onSaveSettings }) {
+export function Header({
+  onOpenScanner,
+  onOpenManual,
+  openAiKey,
+  onSaveSettings,
+  activeProfile,
+  onOpenProfile,
+  activeTab,
+  onSelectTab
+}) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [keyInput, setKeyInput] = useState(openAiKey || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -34,8 +43,19 @@ export function Header({ onOpenScanner, onOpenManual, openAiKey, onSaveSettings 
           </div>
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons and Profile */}
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Active User Profile Button */}
+          <button
+            onClick={onOpenProfile}
+            className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-amber-200/80 hover:bg-amber-300 text-amber-950 text-xs font-bold transition border border-amber-300/80 shadow-xs cursor-pointer"
+          >
+            <span className="text-base">{activeProfile?.avatar || '👤'}</span>
+            <span className="hidden sm:inline truncate max-w-[100px]">
+              {activeProfile?.name || 'Profil'}
+            </span>
+          </button>
+
           <button
             onClick={onOpenScanner}
             className="inline-flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-amber-400 hover:bg-amber-500 text-amber-950 font-medium text-sm transition shadow-xs cursor-pointer active:scale-95"
@@ -62,6 +82,28 @@ export function Header({ onOpenScanner, onOpenManual, openAiKey, onSaveSettings 
             <Key className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      {/* App Navigation Tabs */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center space-x-1 sm:space-x-2 pt-1 border-t border-amber-200/50">
+        {[
+          { id: 'library', label: 'Moje Knihovna', icon: '📚' },
+          { id: 'community', label: 'Veřejný prostor & Komunita', icon: '💬' },
+          { id: 'history', label: 'Historie prohlížení', icon: '🕒' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => onSelectTab(tab.id)}
+            className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-t-xl transition cursor-pointer flex items-center space-x-1.5 border-b-2 ${
+              activeTab === tab.id
+                ? 'bg-amber-50 text-amber-950 border-amber-500 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-amber-100/50 border-transparent'
+            }`}
+          >
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Settings Modal */}
