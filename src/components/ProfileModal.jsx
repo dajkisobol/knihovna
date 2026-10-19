@@ -36,20 +36,20 @@ export function ProfileModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-amber-50 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-amber-200 relative animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-[#fbf9f5] rounded-2xl max-w-md w-full p-6 shadow-2xl border border-emerald-200 relative animate-in fade-in zoom-in-95 duration-200">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-amber-200/50 text-stone-500 hover:text-stone-800 transition cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200/60 text-stone-500 hover:text-stone-800 transition cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="flex items-center space-x-3 mb-5">
-          <div className="p-2.5 bg-amber-300 text-amber-950 rounded-xl text-xl">
+          <div className="p-2.5 bg-emerald-800 text-stone-50 rounded-xl text-xl">
             {activeProfile?.avatar || '👤'}
           </div>
           <div>
-            <h3 className="text-lg font-bold text-stone-900">Uživatelský profil</h3>
+            <h3 className="text-lg font-serif font-bold text-stone-900">Uživatelský profil</h3>
             <p className="text-xs text-stone-600">Správa profilů a nastavení identity</p>
           </div>
         </div>
@@ -57,7 +57,7 @@ export function ProfileModal({
         {/* Existing Profiles List */}
         {!isCreating ? (
           <div className="space-y-4">
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
               {profiles.map((prof) => {
                 const isActive = activeProfile?.id === prof.id;
                 return (
@@ -66,8 +66,8 @@ export function ProfileModal({
                     onClick={() => onSwitchProfile(prof)}
                     className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition ${
                       isActive
-                        ? 'bg-amber-200/80 border-amber-400 shadow-xs'
-                        : 'bg-white/80 hover:bg-amber-100/60 border-amber-200/80'
+                        ? 'bg-emerald-100/80 border-emerald-400 shadow-xs'
+                        : 'bg-white hover:bg-emerald-50/60 border-stone-200'
                     }`}
                   >
                     <div className="flex items-center space-x-3">
@@ -82,7 +82,7 @@ export function ProfileModal({
                       </div>
                     </div>
                     {isActive && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold flex items-center space-x-1">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-800 text-stone-50 text-[10px] font-bold flex items-center space-x-1">
                         <Check className="w-3 h-3" />
                         <span>Aktivní</span>
                       </span>
@@ -94,7 +94,7 @@ export function ProfileModal({
 
             <button
               onClick={() => setIsCreating(true)}
-              className="w-full py-2.5 rounded-xl border border-dashed border-amber-400 hover:bg-amber-100/60 text-amber-900 font-semibold text-xs flex items-center justify-center space-x-2 transition cursor-pointer"
+              className="w-full py-2.5 rounded-xl border border-dashed border-emerald-400 hover:bg-emerald-50 text-emerald-900 font-semibold text-xs flex items-center justify-center space-x-2 transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Založit nový profil</span>
@@ -115,8 +115,8 @@ export function ProfileModal({
                     onClick={() => setAvatarInput(av)}
                     className={`w-9 h-9 rounded-xl text-xl flex items-center justify-center border transition ${
                       avatarInput === av
-                        ? 'bg-amber-300 border-amber-500 scale-105 shadow-xs'
-                        : 'bg-white hover:bg-amber-100 border-amber-200'
+                        ? 'bg-emerald-200 border-emerald-500 scale-105 shadow-xs'
+                        : 'bg-white hover:bg-emerald-50 border-stone-200'
                     }`}
                   >
                     {av}
@@ -135,7 +135,7 @@ export function ProfileModal({
                 onChange={(e) => setNameInput(e.target.value)}
                 placeholder="Např. Eliška_Knihy"
                 required
-                className="w-full px-3.5 py-2 rounded-xl border border-amber-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full px-3.5 py-2 rounded-xl border border-stone-200 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
@@ -147,8 +147,8 @@ export function ProfileModal({
                 type="text"
                 value={bioInput}
                 onChange={(e) => setBioInput(e.target.value)}
-                placeholder="Např. Čtu neraději sci-fi a detektivky"
-                className="w-full px-3.5 py-2 rounded-xl border border-amber-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="Např. Čtu nejraději sci-fi a detektivky"
+                className="w-full px-3.5 py-2 rounded-xl border border-stone-200 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
@@ -156,13 +156,13 @@ export function ProfileModal({
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="px-4 py-2 rounded-xl text-xs text-stone-600 hover:bg-amber-100 transition"
+                className="px-4 py-2 rounded-xl text-xs text-stone-600 hover:bg-stone-200/60 transition"
               >
                 Zpět
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-semibold text-xs shadow-xs transition"
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs shadow-xs transition"
               >
                 Vytvořit profil
               </button>
@@ -170,7 +170,7 @@ export function ProfileModal({
           </form>
         )}
 
-        <div className="mt-6 pt-4 border-t border-amber-200 flex justify-end">
+        <div className="mt-6 pt-4 border-t border-stone-200 flex justify-end">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs bg-stone-200 hover:bg-stone-300 text-stone-800 font-medium transition cursor-pointer"

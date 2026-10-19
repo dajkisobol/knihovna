@@ -7,9 +7,10 @@ export function BarcodeScannerModal({ isOpen, onClose, onDetected }) {
   const [scanError, setScanError] = useState(null);
 
   useEffect(() => {
-    if (!isOpen) return;
-
-    setScanError(null);
+    if (!isOpen) {
+      setScanError(null);
+      return;
+    }
 
     const timer = setTimeout(() => {
       const config = {
@@ -35,7 +36,7 @@ export function BarcodeScannerModal({ isOpen, onClose, onDetected }) {
             }
             onDetected(decodedText);
           },
-          (errorMessage) => {
+          (_errorMessage) => {
             // Ignore normal non-detection frames
           }
         );
@@ -60,31 +61,31 @@ export function BarcodeScannerModal({ isOpen, onClose, onDetected }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-amber-50 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-amber-200 relative animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-[#fbf9f5] rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-emerald-200 relative animate-in fade-in zoom-in-95 duration-200">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-amber-200/50 text-stone-500 hover:text-stone-800 transition cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200/60 text-stone-500 hover:text-stone-800 transition cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="flex items-center space-x-3 mb-4">
-          <div className="p-2.5 bg-amber-200/80 text-amber-950 rounded-xl">
-            <Camera className="w-5 h-5" />
+          <div className="p-2.5 bg-emerald-100 text-emerald-950 rounded-xl border border-emerald-200">
+            <Camera className="w-5 h-5 text-emerald-800" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-stone-900">Naskenovat čárový kód (ISBN)</h3>
+            <h3 className="text-lg font-serif font-semibold text-stone-900">Naskenovat čárový kód (ISBN)</h3>
             <p className="text-xs text-stone-600">Namiřte kameru na EAN / ISBN čárový kód na zadní straně knihy</p>
           </div>
         </div>
 
         {scanError ? (
-          <div className="p-4 bg-amber-100 border border-amber-300 rounded-xl text-amber-900 text-sm flex items-start space-x-2 my-4">
-            <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-900 text-sm flex items-start space-x-2 my-4">
+            <AlertCircle className="w-5 h-5 text-red-700 shrink-0 mt-0.5" />
             <span>{scanError}</span>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-amber-300/80 bg-stone-900 my-3">
+          <div className="overflow-hidden rounded-xl border border-emerald-300 bg-stone-900 my-3">
             <div id="reader" className="w-full text-white"></div>
           </div>
         )}
@@ -92,7 +93,7 @@ export function BarcodeScannerModal({ isOpen, onClose, onDetected }) {
         <div className="mt-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm bg-stone-200 hover:bg-stone-300 text-stone-800 font-medium transition cursor-pointer"
+            className="px-4 py-2 rounded-xl text-sm bg-stone-200 hover:bg-stone-300 text-stone-800 font-medium transition cursor-pointer"
           >
             Zavřít
           </button>
