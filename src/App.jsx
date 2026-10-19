@@ -7,6 +7,7 @@ import { LibraryView } from './components/LibraryView';
 import { CommunityView } from './components/CommunityView';
 import { HistoryView } from './components/HistoryView';
 import { ProfileModal } from './components/ProfileModal';
+import { AiChatModal } from './components/AiChatModal';
 import { fetchBookByIsbn, enrichBookWithOpenAI } from './services/bookService';
 import {
   getSavedBooks,
@@ -21,7 +22,7 @@ import {
   addBrowsingHistory,
   clearBrowsingHistory
 } from './utils/storage';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Bot } from 'lucide-react';
 
 export default function App() {
   const [books, setBooks] = useState([]);
@@ -39,6 +40,10 @@ export default function App() {
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // AI Chatbot State
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [bookToDiscuss, setBookToDiscuss] = useState(null);
 
   // Loading & error state
   const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +65,12 @@ export default function App() {
     setIsDetailOpen(true);
     const updatedHistory = addBrowsingHistory(book);
     setBrowsingHistory(updatedHistory);
+  };
+
+  const handleOpenBookConsultation = (book) => {
+    setBookToDiscuss(book);
+    setIsDetailOpen(false);
+    setIsAiChatOpen(true);
   };
 
   const handleSwitchProfile = (prof) => {
@@ -110,7 +121,7 @@ export default function App() {
         return;
       }
 
-      // Fetch book info from Google / Open Library
+      // Fetch book info from Knihovny.cz / Google / Open Library
       let fetchedBook = await fetchBookByIsbn(isbn);
 
       // Auto-enrich with OpenAI if API key exists
@@ -180,7 +191,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50/80 via-amber-50/40 to-stone-100 flex flex-col font-sans text-stone-800">
+    <div className="min-h-screen bg-[#fbf9f5] flex flex-col font-sans text-stone-800 relative">
       {/* Header */}
       <Header
         onOpenScanner={() => {
@@ -197,20 +208,24 @@ export default function App() {
         onOpenProfile={() => setIsProfileModalOpen(true)}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
+        onOpenAiChat={() => {
+          setBookToDiscuss(null);
+          setIsAiChatOpen(true);
+        }}
       />
 
       {/* Main Body */}
       <main className="max-w-6xl w-full mx-auto px-4 py-6 sm:px-6 flex-1">
         {/* Error notification banner */}
         {errorMessage && (
-          <div className="mb-6 p-4 bg-amber-100/90 border border-amber-300 text-amber-950 rounded-2xl flex items-center justify-between shadow-xs">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-900 rounded-2xl flex items-center justify-between shadow-xs">
             <div className="flex items-center space-x-3">
-              <AlertCircle className="w-5 h-5 text-amber-800 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-red-700 shrink-0" />
               <p className="text-sm font-medium">{errorMessage}</p>
             </div>
             <button
               onClick={() => setErrorMessage('')}
-              className="text-amber-800 hover:text-amber-950 text-xs font-semibold underline px-2 py-1"
+              className="text-red-800 hover:text-red-950 text-xs font-semibold underline px-2 py-1"
             >
               Zavřít
             </button>
@@ -219,8 +234,8 @@ export default function App() {
 
         {/* Global Loading overlay indicator */}
         {isLoading && (
-          <div className="mb-6 p-5 bg-amber-100/60 border border-amber-200 rounded-2xl flex items-center justify-center space-x-3 text-amber-950 animate-pulse">
-            <Loader2 className="w-5 h-5 animate-spin" />
+          <div className="mb-6 p-5 bg-emerald-100/70 border border-emerald-200 rounded-2xl flex items-center justify-center space-x-3 text-emerald-950 animate-pulse">
+            <Loader2 className="w-5 h-5 animate-spin text-emerald-800" />
             <span className="text-sm font-medium">Vyhledávám knihu podle ISBN...</span>
           </div>
         )}
@@ -250,6 +265,20 @@ export default function App() {
         )}
       </main>
 
+      {/* Floating AI Chatbot Action Button */}
+      <button
+        onClick={() => {
+          setBookToDiscuss(null);
+          setIsAiChatOpen(true);
+        }}
+        className="fixed bottom-6 right-6 z-40 p-3.5 sm:px-4 sm:py-3.5 bg-emerald-800 hover:bg-emerald-700 text-stone-50 rounded-2xl shadow-xl flex items-center space-x-2.5 transition transform hover:scale-105 active:scale-95 border border-emerald-600/80 cursor-pointer"
+        title="Otevřít AI knižního asistenta"
+      >
+        <Bot className="w-6 h-6 text-emerald-200" />
+        <span className="hidden sm:inline text-xs font-bold font-serif">AI Knižní Asistent</span>
+      </button>
+
+      {/* Modals */}
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -259,7 +288,6 @@ export default function App() {
         onCreateProfile={handleCreateProfile}
       />
 
-      {/* Modals */}
       <BarcodeScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
@@ -280,11 +308,25 @@ export default function App() {
         isAlreadyInLibrary={books.some((b) => b?.isbn === selectedBook?.isbn)}
         onEnrichAi={handleEnrichWithAi}
         isAiLoading={isAiLoading}
+        onOpenConsultation={handleOpenBookConsultation}
+      />
+
+      <AiChatModal
+        isOpen={isAiChatOpen}
+        onClose={() => setIsAiChatOpen(false)}
+        openAiKey={settings.openAiKey}
+        onOpenSettings={() => {
+          setIsAiChatOpen(false);
+          // show settings modal by calling key button or similar
+        }}
+        books={books}
+        browsingHistory={browsingHistory}
+        initialBookToDiscuss={bookToDiscuss}
       />
 
       {/* Footer */}
-      <footer className="border-t border-amber-200/60 bg-amber-100/30 py-4 mt-8 text-center text-xs text-stone-500">
-        <p>Moje Knihovna &copy; {new Date().getFullYear()} — Vytvořeno v jemném žlutém designu pro pohodlné skenování knih</p>
+      <footer className="border-t border-stone-200 bg-stone-100/60 py-4 mt-8 text-center text-xs text-stone-500">
+        <p>Moje Knihovna &copy; {new Date().getFullYear()} — Vytvořeno v elegantním šalvějovém designu s chytrým AI knižním asistentem</p>
       </footer>
     </div>
   );

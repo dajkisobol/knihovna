@@ -87,16 +87,16 @@ export function CommunityView({ activeProfile, books }) {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-amber-200/80 via-amber-100 to-amber-200/50 p-5 rounded-2xl border border-amber-300/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-emerald-900 text-stone-100 p-5 rounded-2xl border border-emerald-800 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center space-x-3.5">
-          <div className="p-3 bg-amber-400 text-amber-950 rounded-xl text-2xl shadow-xs">
+          <div className="p-3 bg-emerald-800 text-emerald-100 rounded-xl text-2xl border border-emerald-700">
             💬
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-stone-900 tracking-tight">
+            <h2 className="text-xl font-serif font-extrabold text-stone-50 tracking-tight">
               Veřejný komunitní prostor
             </h2>
-            <p className="text-xs text-stone-700 font-medium">
+            <p className="text-xs text-emerald-200/80 font-medium">
               Sdílejte hodnocení knih a diskutujte živě s ostatními čtenáři
             </p>
           </div>
@@ -105,7 +105,7 @@ export function CommunityView({ activeProfile, books }) {
         <button
           onClick={loadData}
           disabled={loading}
-          className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-300 hover:bg-amber-400 text-amber-950 font-semibold text-xs transition cursor-pointer shadow-xs"
+          className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-stone-100 font-semibold text-xs transition cursor-pointer border border-emerald-600/70"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Obnovit živá data</span>
@@ -113,16 +113,16 @@ export function CommunityView({ activeProfile, books }) {
       </div>
 
       {/* Tabs bar */}
-      <div className="flex items-center space-x-2 border-b border-amber-200 pb-1">
+      <div className="flex items-center space-x-2 border-b border-stone-200 pb-1">
         <button
           onClick={() => setActiveTab('reviews')}
           className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm flex items-center space-x-2 transition cursor-pointer ${
             activeTab === 'reviews'
-              ? 'bg-amber-400 text-amber-950 shadow-xs'
-              : 'text-stone-600 hover:bg-amber-100'
+              ? 'bg-emerald-800 text-stone-50 shadow-xs'
+              : 'text-stone-600 hover:bg-emerald-100/50'
           }`}
         >
-          <Star className="w-4 h-4 fill-amber-950/20" />
+          <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
           <span>Recenze & Hodnocení</span>
         </button>
 
@@ -130,8 +130,8 @@ export function CommunityView({ activeProfile, books }) {
           onClick={() => setActiveTab('chat')}
           className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm flex items-center space-x-2 transition cursor-pointer ${
             activeTab === 'chat'
-              ? 'bg-amber-400 text-amber-950 shadow-xs'
-              : 'text-stone-600 hover:bg-amber-100'
+              ? 'bg-emerald-800 text-stone-50 shadow-xs'
+              : 'text-stone-600 hover:bg-emerald-100/50'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -143,9 +143,9 @@ export function CommunityView({ activeProfile, books }) {
       {activeTab === 'reviews' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Post New Review Form */}
-          <div className="lg:col-span-1 bg-amber-100/60 p-5 rounded-2xl border border-amber-200 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-stone-900 flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-amber-700" />
+          <div className="lg:col-span-1 bg-stone-50/90 p-5 rounded-2xl border border-emerald-900/10 shadow-xs space-y-4">
+            <h3 className="text-sm font-serif font-bold text-emerald-950 flex items-center space-x-2">
+              <Sparkles className="w-4 h-4 text-emerald-700" />
               <span>Napsat hodnocení k knize</span>
             </h3>
 
@@ -157,7 +157,7 @@ export function CommunityView({ activeProfile, books }) {
                 <select
                   value={selectedBookIsbn}
                   onChange={(e) => setSelectedBookIsbn(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-stone-800 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-white text-stone-800 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                 >
                   <option value="">Všeobecná recenze / Vybrat knihu...</option>
                   {books.map((b) => (
@@ -172,7 +172,7 @@ export function CommunityView({ activeProfile, books }) {
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
                   Hodnocení
                 </label>
-                <div className="flex items-center space-x-1 bg-white/80 p-2 rounded-xl border border-amber-200">
+                <div className="flex items-center space-x-1 bg-white p-2 rounded-xl border border-stone-200">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
@@ -203,14 +203,14 @@ export function CommunityView({ activeProfile, books }) {
                   placeholder="Co se vám na knize nejvíce líbilo nebo co vás překvapilo?"
                   rows={3}
                   required
-                  className="w-full p-3 rounded-xl border border-amber-300 bg-white text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  className="w-full p-3 rounded-xl border border-stone-200 bg-white text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmittingReview}
-                className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs shadow-xs transition cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
               >
                 {isSubmittingReview ? 'Odesílám...' : 'Zveřejnit recenzi'}
               </button>
@@ -223,17 +223,17 @@ export function CommunityView({ activeProfile, books }) {
               reviews.map((rev) => (
                 <div
                   key={rev.id || rev.created_at}
-                  className="bg-white/80 border border-amber-200 p-4 rounded-2xl shadow-xs space-y-2"
+                  className="bg-white border border-stone-200 p-4 rounded-2xl shadow-xs space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2.5">
-                      <span className="text-xl p-1 bg-amber-100 rounded-lg">{rev.avatar || '👤'}</span>
+                      <span className="text-xl p-1 bg-emerald-50 rounded-lg border border-emerald-100">{rev.avatar || '👤'}</span>
                       <div>
                         <h4 className="text-xs font-bold text-stone-900 leading-tight">
                           {rev.userName || rev.user_name || 'Čtenář'}
                         </h4>
-                        <span className="text-[10px] text-amber-800 font-medium">
-                          kniha: <strong className="text-stone-800">{rev.bookTitle || rev.book_title || 'Maly princ'}</strong>
+                        <span className="text-[10px] text-emerald-800 font-medium">
+                          kniha: <strong className="text-stone-800">{rev.bookTitle || rev.book_title || 'Malý princ'}</strong>
                         </span>
                       </div>
                     </div>
@@ -252,13 +252,13 @@ export function CommunityView({ activeProfile, books }) {
                     </div>
                   </div>
 
-                  <p className="text-xs text-stone-700 leading-relaxed bg-amber-50/50 p-2.5 rounded-xl border border-amber-100">
+                  <p className="text-xs text-stone-700 leading-relaxed bg-[#fbf9f5] p-2.5 rounded-xl border border-stone-200/60">
                     "{rev.comment}"
                   </p>
                 </div>
               ))
             ) : (
-              <p className="text-xs text-stone-500 text-center py-10 bg-amber-100/30 rounded-2xl border border-dashed border-amber-300">
+              <p className="text-xs text-stone-500 text-center py-10 bg-stone-50 rounded-2xl border border-dashed border-stone-300">
                 Zatím nebyly přidány žádné recenze. Buďte první!
               </p>
             )}
@@ -268,7 +268,7 @@ export function CommunityView({ activeProfile, books }) {
 
       {/* Tab Content 2: Chat */}
       {activeTab === 'chat' && (
-        <div className="bg-amber-100/40 border border-amber-200 rounded-2xl p-4 sm:p-5 space-y-4 max-w-3xl mx-auto shadow-xs">
+        <div className="bg-stone-50/90 border border-stone-200 rounded-2xl p-4 sm:p-5 space-y-4 max-w-3xl mx-auto shadow-xs">
           <div className="h-80 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
             {chatMessages.map((msg) => {
               const isMe = msg.userName === activeProfile?.name;
@@ -277,14 +277,14 @@ export function CommunityView({ activeProfile, books }) {
                   key={msg.id || msg.created_at}
                   className={`flex items-start space-x-2.5 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}`}
                 >
-                  <span className="text-2xl p-1 bg-amber-200/80 rounded-xl shrink-0">
+                  <span className="text-2xl p-1 bg-emerald-100 rounded-xl shrink-0 border border-emerald-200">
                     {msg.avatar || '👤'}
                   </span>
                   <div
                     className={`max-w-[80%] p-3 rounded-2xl text-xs space-y-1 shadow-xs ${
                       isMe
-                        ? 'bg-amber-400 text-amber-950 font-medium rounded-tr-none'
-                        : 'bg-white text-stone-800 border border-amber-200 rounded-tl-none'
+                        ? 'bg-emerald-800 text-stone-50 font-medium rounded-tr-none'
+                        : 'bg-white text-stone-800 border border-stone-200 rounded-tl-none'
                     }`}
                   >
                     <p className="text-[10px] font-bold opacity-80">
@@ -298,18 +298,18 @@ export function CommunityView({ activeProfile, books }) {
           </div>
 
           {/* Send Message Form */}
-          <form onSubmit={handleSendChat} className="flex items-center space-x-2 pt-2 border-t border-amber-200">
+          <form onSubmit={handleSendChat} className="flex items-center space-x-2 pt-2 border-t border-stone-200">
             <input
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder={`Napište zprávu jako ${activeProfile?.name || 'Čtenář'}...`}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-amber-300 bg-white text-stone-900 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 bg-white text-stone-900 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <button
               type="submit"
               disabled={isSendingChat}
-              className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center space-x-1.5 transition shadow-xs cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center space-x-1.5 transition shadow-xs cursor-pointer"
             >
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">{isSendingChat ? 'Odesílám...' : 'Odeslat'}</span>
