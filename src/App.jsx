@@ -4,7 +4,6 @@ import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { ManualIsbnModal } from './components/ManualIsbnModal';
 import { BookDetailModal } from './components/BookDetailModal';
 import { LibraryView } from './components/LibraryView';
-import { CommunityView } from './components/CommunityView';
 import { HistoryView } from './components/HistoryView';
 import { ProfileModal } from './components/ProfileModal';
 import { AiChatModal } from './components/AiChatModal';
@@ -32,7 +31,7 @@ export default function App() {
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('library'); // 'library' | 'community' | 'history'
+  const [activeTab, setActiveTab] = useState('library'); // 'library' | 'history'
   const [browsingHistory, setBrowsingHistory] = useState([]);
 
   // Modals state
@@ -246,13 +245,6 @@ export default function App() {
             books={books}
             onViewBook={handleOpenBookDetail}
             onDeleteBook={handleDeleteBook}
-          />
-        )}
-
-        {activeTab === 'community' && (
-          <CommunityView
-            activeProfile={activeProfile}
-            books={books}
           />
         )}
 
