@@ -3,7 +3,9 @@ import {
   cleanPunctuation,
   parseAuthors,
   parseYear,
-  parsePageCount
+  parsePageCount,
+  parseKnihovnyCzDescription,
+  generateStructuredDetails
 } from './bookService.js';
 
 // Sample JSON response provided in instructions
@@ -48,6 +50,25 @@ function runTests() {
 
   console.log('Testing parsePageCount...');
   console.assert(parsePageCount(record.physicalDescriptions) === 218, 'Page count parsing failed');
+
+  console.log('Testing parseKnihovnyCzDescription...');
+  const sampleMatchWithSummary = {
+    summary: ['Historický román popisující životy provensálských básníků.']
+  };
+  const parsedDesc = parseKnihovnyCzDescription(sampleMatchWithSummary);
+  console.assert(parsedDesc === 'Historický román popisující životy provensálských básníků.', 'parseKnihovnyCzDescription failed');
+
+  console.log('Testing generateStructuredDetails...');
+  const details = generateStructuredDetails(
+    'Fascinující román o lásce a odvaze v historické Francii.',
+    'Životy básníků',
+    'Jean de Nostredame',
+    'Historický román'
+  );
+  console.assert(details.description === 'Fascinující román o lásce a odvaze v historické Francii.', 'generateStructuredDetails description failed');
+  console.assert(Array.isArray(details.mainIdeas) && details.mainIdeas.length > 0, 'generateStructuredDetails mainIdeas failed');
+  console.assert(typeof details.characterNotes === 'string' && details.characterNotes.length > 0, 'generateStructuredDetails characterNotes failed');
+  console.assert(typeof details.recommendation === 'string' && details.recommendation.length > 0, 'generateStructuredDetails recommendation failed');
 
   console.log('All bookService helper tests passed successfully!');
 }

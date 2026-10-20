@@ -124,9 +124,72 @@ function extractFallbackMainIdeas(description, title, authors) {
 /**
  * Clean up HTML tags from description strings
  */
-function stripHtmlTags(str) {
+export function stripHtmlTags(str) {
   if (!str) return '';
   return str.replace(/<\/?[^>]+(>|$)/g, '').trim();
+}
+
+/**
+ * Extracts description or annotation text from Knihovny.cz record fields
+ */
+export function parseKnihovnyCzDescription(match) {
+  if (!match) return '';
+  const parts = [];
+
+  if (Array.isArray(match.summary) && match.summary.length > 0) {
+    parts.push(...match.summary);
+  } else if (typeof match.summary === 'string' && match.summary.trim()) {
+    parts.push(match.summary.trim());
+  }
+
+  if (Array.isArray(match.notes) && match.notes.length > 0) {
+    parts.push(...match.notes);
+  } else if (typeof match.notes === 'string' && match.notes.trim()) {
+    parts.push(match.notes.trim());
+  }
+
+  if (Array.isArray(match.contents) && match.contents.length > 0) {
+    parts.push(...match.contents);
+  } else if (typeof match.contents === 'string' && match.contents.trim()) {
+    parts.push(match.contents.trim());
+  }
+
+  return parts.map(p => stripHtmlTags(p)).filter(Boolean).join('\n\n');
+}
+
+/**
+ * Generates structured plot summary, main ideas, character notes, and reader recommendations
+ */
+export function generateStructuredDetails(rawDesc, title, authors, genre = 'Obecná literatura') {
+  const cleanDesc = stripHtmlTags(rawDesc).trim();
+
+  let description = cleanDesc;
+  if (!description) {
+    description = `Kniha "${title}" od autora ${authors || 'neznámého autora'} v žánru ${genre}. Podrobné literární dílo z knižního katalogu.`;
+  }
+
+  const mainIdeas = extractFallbackMainIdeas(cleanDesc, title, authors);
+
+  let characterNotes = '';
+  if (cleanDesc.length > 50) {
+    characterNotes = `Příběh a děj knihy "${title}" vykresluje klíčové postavy, jejich motivace a vztahy z pera autora ${authors}.`;
+  } else {
+    characterNotes = `Postavy a autorův styl v díle "${title}" od autora ${authors}.`;
+  }
+
+  let recommendation = '';
+  if (genre && genre !== 'Obecná literatura' && genre !== 'Česká knihovní databáze') {
+    recommendation = `Doporučujeme čtenářům, kteří se zajímají o žánr ${genre} a díla od autora ${authors}.`;
+  } else {
+    recommendation = `Doporučujeme čtenářům vyhledávajícím tvorbu autora ${authors} a kvalitní literaturu.`;
+  }
+
+  return {
+    description,
+    mainIdeas,
+    characterNotes,
+    recommendation
+  };
 }
 
 /**
@@ -144,7 +207,10 @@ export async function fetchFromKnihovnyCz(targetIsbn13) {
     'isbns',
     'issns',
     'cnb',
-    'formats'
+    'formats',
+    'summary',
+    'notes',
+    'contents'
   ];
 
   const params = new URLSearchParams({
@@ -187,14 +253,18 @@ export async function fetchFromKnihovnyCz(targetIsbn13) {
       : '';
     const publishedDate = parseYear(match.publicationDates);
     const pageCount = parsePageCount(match.physicalDescriptions);
+    const rawDesc = parseKnihovnyCzDescription(match);
+    const structured = generateStructuredDetails(rawDesc, title, authors, 'Česká knihovní databáze');
 
     return {
       isbn: targetIsbn13,
       title,
       authors,
       genre: 'Česká knihovní databáze',
-      description: `Kniha evidovaná v katalogu Knihovny.cz (ČNB: ${match.cnb || 'neuvedeno'}).`,
-      mainIdeas: extractFallbackMainIdeas('', title, authors),
+      description: structured.description,
+      mainIdeas: structured.mainIdeas,
+      characterNotes: structured.characterNotes,
+      recommendation: structured.recommendation,
       coverUrl: '',
       pageCount,
       publisher,
@@ -210,7 +280,7 @@ export async function fetchFromKnihovnyCz(targetIsbn13) {
 }
 
 /**
- * Fetch book information using Knihovny.cz with Google Books & Open Library fallbacks
+ * Fetch book information using Knihovny.cz with Google Books & Open Library fallbacks and enrichments
  */
 export async function fetchBookByIsbn(rawIsbn) {
   const isbn13 = toIsbn13(rawIsbn);
@@ -223,30 +293,47 @@ export async function fetchBookByIsbn(rawIsbn) {
   // 1. Try Knihovny.cz API first
   bookData = await fetchFromKnihovnyCz(isbn13);
 
-  // 2. Try Google Books API fallback
-  if (!bookData) {
-    try {
-      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn13}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.items && data.items.length > 0) {
-          const info = data.items[0].volumeInfo;
-          const rawDesc = stripHtmlTags(info.description || '');
-          const authors = info.authors ? info.authors.join(', ') : 'Neznámý autor';
-          const title = info.title || 'Neznámý název';
+  // 2. Query Google Books API for cover image or missing description
+  try {
+    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn13}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.items && data.items.length > 0) {
+        const info = data.items[0].volumeInfo;
+        const gDesc = stripHtmlTags(info.description || '');
+        const gAuthors = info.authors ? info.authors.join(', ') : '';
+        const gTitle = info.title || '';
+        const gGenre = info.categories ? info.categories.join(', ') : '';
 
-          let coverUrl = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || '';
-          if (coverUrl.startsWith('http://')) {
-            coverUrl = coverUrl.replace('http://', 'https://');
+        let coverUrl = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || '';
+        if (coverUrl.startsWith('http://')) {
+          coverUrl = coverUrl.replace('http://', 'https://');
+        }
+
+        if (bookData) {
+          if (!bookData.coverUrl && coverUrl) {
+            bookData.coverUrl = coverUrl;
           }
-
+          // If Knihovny.cz description was empty/short/generic, replace/enrich with Google Books description
+          if (gDesc && (bookData.description.includes('Kniha "') || bookData.description.length < 80)) {
+            const structured = generateStructuredDetails(gDesc, bookData.title, bookData.authors, gGenre || bookData.genre);
+            bookData.description = structured.description;
+            bookData.mainIdeas = structured.mainIdeas;
+            bookData.characterNotes = structured.characterNotes;
+            bookData.recommendation = structured.recommendation;
+            if (gGenre) bookData.genre = gGenre;
+          }
+        } else {
+          const structured = generateStructuredDetails(gDesc, gTitle, gAuthors, gGenre || 'Obecná literatura');
           bookData = {
             isbn: isbn13,
-            title,
-            authors,
-            genre: info.categories ? info.categories.join(', ') : 'Obecná literatura',
-            description: rawDesc || 'Popis knihy není k dispozici.',
-            mainIdeas: extractFallbackMainIdeas(rawDesc, title, authors),
+            title: gTitle || 'Neznámý název',
+            authors: gAuthors || 'Neznámý autor',
+            genre: gGenre || 'Obecná literatura',
+            description: structured.description,
+            mainIdeas: structured.mainIdeas,
+            characterNotes: structured.characterNotes,
+            recommendation: structured.recommendation,
             coverUrl,
             pageCount: info.pageCount || null,
             publisher: info.publisher || '',
@@ -255,13 +342,13 @@ export async function fetchBookByIsbn(rawIsbn) {
           };
         }
       }
-    } catch (err) {
-      console.warn('Google Books API error, trying Open Library fallback...', err);
     }
+  } catch (err) {
+    console.warn('Google Books API check error:', err);
   }
 
-  // 3. Fallback to Open Library API
-  if (!bookData) {
+  // 3. Query Open Library API for fallback or missing cover
+  if (!bookData || !bookData.coverUrl) {
     try {
       const olRes = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn13}&format=json&jscmd=data`);
       if (olRes.ok) {
@@ -269,24 +356,33 @@ export async function fetchBookByIsbn(rawIsbn) {
         const bookKey = `ISBN:${isbn13}`;
         if (olData[bookKey]) {
           const info = olData[bookKey];
-          const title = info.title || 'Neznámý název';
-          const authors = info.authors ? info.authors.map(a => a.name).join(', ') : 'Neznámý autor';
-          const genre = info.subjects ? info.subjects.slice(0, 3).map(s => s.name).join(', ') : 'Obecná literatura';
+          const olTitle = info.title || 'Neznámý název';
+          const olAuthors = info.authors ? info.authors.map(a => a.name).join(', ') : 'Neznámý autor';
+          const olGenre = info.subjects ? info.subjects.slice(0, 3).map(s => s.name).join(', ') : 'Obecná literatura';
           const coverUrl = info.cover?.large || info.cover?.medium || info.cover?.small || '';
 
-          bookData = {
-            isbn: isbn13,
-            title,
-            authors,
-            genre,
-            description: 'Popis z rozhraní Open Library není k dispozici v plném znění.',
-            mainIdeas: extractFallbackMainIdeas('', title, authors),
-            coverUrl,
-            pageCount: info.number_of_pages || null,
-            publisher: info.publishers ? info.publishers.map(p => p.name).join(', ') : '',
-            publishedDate: info.publish_date || '',
-            source: 'Open Library'
-          };
+          if (bookData) {
+            if (!bookData.coverUrl && coverUrl) {
+              bookData.coverUrl = coverUrl;
+            }
+          } else {
+            const structured = generateStructuredDetails('', olTitle, olAuthors, olGenre);
+            bookData = {
+              isbn: isbn13,
+              title: olTitle,
+              authors: olAuthors,
+              genre: olGenre,
+              description: structured.description,
+              mainIdeas: structured.mainIdeas,
+              characterNotes: structured.characterNotes,
+              recommendation: structured.recommendation,
+              coverUrl,
+              pageCount: info.number_of_pages || null,
+              publisher: info.publishers ? info.publishers.map(p => p.name).join(', ') : '',
+              publishedDate: info.publish_date || '',
+              source: 'Open Library'
+            };
+          }
         }
       }
     } catch (err) {
