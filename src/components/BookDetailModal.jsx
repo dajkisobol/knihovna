@@ -273,7 +273,7 @@ export function BookDetailModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                Krátké shrnutí děje
+                Shrnutí děje a anotace
               </h3>
               {!isEditing && (
                 <button
