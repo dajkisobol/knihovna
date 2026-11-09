@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BookCover } from './BookCover';
 import { X, Star, Sparkles, Plus, Trash2, Edit3, Check, BookOpen, Tag, Calendar, Building, BookMarked, MessageSquare } from 'lucide-react';
 
 export function BookDetailModal({
@@ -88,18 +89,7 @@ export function BookDetailModal({
         <div className="overflow-y-auto pr-1 space-y-6 custom-scrollbar">
           {/* Header section with cover & title */}
           <div className="flex flex-col sm:flex-row gap-5 items-start">
-            {editedBook.coverUrl ? (
-              <img
-                src={editedBook.coverUrl}
-                alt={editedBook.title}
-                className="w-28 sm:w-36 h-40 sm:h-52 object-cover rounded-xl shadow-md border border-emerald-200 shrink-0 self-center sm:self-start"
-              />
-            ) : (
-              <div className="w-28 sm:w-36 h-40 sm:h-52 bg-emerald-50 rounded-xl border border-emerald-200 flex flex-col items-center justify-center text-emerald-800 shrink-0 self-center sm:self-start">
-                <BookOpen className="w-10 h-10 opacity-60 mb-2" />
-                <span className="text-xs text-center font-medium px-2">Bez obálky</span>
-              </div>
-            )}
+            <BookCover book={editedBook} className="w-28 sm:w-36 h-40 sm:h-52 rounded-xl shadow-md border border-emerald-200 shrink-0 self-center sm:self-start" />
 
             <div className="flex-1 space-y-3">
               <div>
