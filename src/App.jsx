@@ -4,7 +4,6 @@ import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { ManualIsbnModal } from './components/ManualIsbnModal';
 import { BookDetailModal } from './components/BookDetailModal';
 import { LibraryView } from './components/LibraryView';
-import { CommunityView } from './components/CommunityView';
 import { HistoryView } from './components/HistoryView';
 import { ProfileModal } from './components/ProfileModal';
 import { AiChatModal } from './components/AiChatModal';
@@ -246,13 +245,6 @@ export default function App() {
             books={books}
             onViewBook={handleOpenBookDetail}
             onDeleteBook={handleDeleteBook}
-          />
-        )}
-
-        {activeTab === 'community' && (
-          <CommunityView
-            activeProfile={activeProfile}
-            books={books}
           />
         )}
 

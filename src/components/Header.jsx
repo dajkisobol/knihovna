@@ -99,7 +99,6 @@ export function Header({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center space-x-1 sm:space-x-2 pt-1 border-t border-emerald-800/60">
         {[
           { id: 'library', label: 'Moje Knihovna', icon: '📚' },
-          { id: 'community', label: 'Veřejný prostor & Komunita', icon: '💬' },
           { id: 'history', label: 'Historie prohlížení', icon: '🕒' }
         ].map((tab) => (
           <button
