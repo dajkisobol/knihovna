@@ -86,9 +86,9 @@ export default function App() {
   const cloudRevision = useRef(0);
   const localSnapshot = useRef({books: loadBooks(), sections: loadSections(), shelves: loadShelves()});
 
-  useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(books)); } catch { setMessage('Úložiště prohlížeče je plné nebo nedostupné. Exportujte zálohu.'); } }, [books]);
-  useEffect(() => { localStorage.setItem(SECTION_KEY, JSON.stringify(sections)); }, [sections]);
-  useEffect(() => { localStorage.setItem(SHELF_KEY, JSON.stringify(shelves)); }, [shelves]);
+  useEffect(() => { if (cloudUser) return; try { localStorage.setItem(KEY, JSON.stringify(books)); } catch { setMessage('Úložiště prohlížeče je plné nebo nedostupné. Exportujte zálohu.'); } }, [books, cloudUser]);
+  useEffect(() => { if (!cloudUser) localStorage.setItem(SECTION_KEY, JSON.stringify(sections)); }, [sections, cloudUser]);
+  useEffect(() => { if (!cloudUser) localStorage.setItem(SHELF_KEY, JSON.stringify(shelves)); }, [shelves, cloudUser]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -117,7 +117,7 @@ export default function App() {
         setCloudStatus('empty');
       }
       cloudRevision.current += 1;
-      setCloudReady(true);
+      setCloudReady(Boolean(data));
     };
     supabase.auth.getSession().then(({data}) => loadAccount(data.session)).catch(()=>setCloudStatus('error'));
     const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
@@ -149,8 +149,10 @@ export default function App() {
     setBooks(localSnapshot.current.books);
     setSections(localSnapshot.current.sections);
     setShelves(localSnapshot.current.shelves);
+    setCloudReady(true);
     setCloudStatus('saving');
   };
+  const startEmptyCloud = () => {setCloudReady(true);setCloudStatus('saving');};
 
   const filtered = useMemo(() => books.filter(b => {
     const text = [b.title, b.authors, b.isbn, b.section, b.shelf, b.note, b.borrower].join(' ').toLocaleLowerCase('cs');
@@ -267,7 +269,7 @@ export default function App() {
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 flex items-start gap-2"><AlertTriangle size={19} className="shrink-0 mt-0.5"/><span><b>Lokální evidence:</b> knihy se zatím ukládají jen v tomto prohlížeči a nesynchronizují se mezi počítači. Pro jistotu pravidelně stahujte JSON zálohu. Pro skutečný sdílený provoz knihovny je nutná online databáze a přihlášení.</span></div>
         {cloudUser && <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 flex flex-wrap justify-between gap-2 items-center text-sm">
           <span>☁ Online účet: <strong>{cloudUser.email}</strong> · {cloudStatus === 'saved' ? 'Uloženo online' : cloudStatus === 'saving' ? 'Ukládám…' : cloudStatus === 'loading' ? 'Načítám…' : cloudStatus === 'empty' ? 'Prázdný online katalog' : cloudStatus === 'error' ? 'Chyba synchronizace' : 'Připraveno'}</span>
-          {!hasCloudData && cloudReady && <button onClick={importLocalToCloud} className="bg-emerald-800 text-white rounded-lg px-3 py-2">Nahrát původní místní knihy</button>}
+          {!hasCloudData && !cloudReady && cloudStatus === 'empty' && <div className="flex flex-wrap gap-2"><button onClick={importLocalToCloud} className="bg-emerald-800 text-white rounded-lg px-3 py-2">Převzít místní knihy</button><button onClick={startEmptyCloud} className="bg-stone-100 rounded-lg px-3 py-2">Začít s prázdným katalogem</button></div>}
         </div>}
         {message && <div role="status" className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm flex items-center justify-between gap-3"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Zavřít oznámení"><X size={18}/></button></div>}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
