@@ -3,6 +3,7 @@ import { BookOpen, ScanLine, Search, Plus, Download, Upload, CheckCircle2, Clock
 import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { ManualIsbnModal } from './components/ManualIsbnModal';
 import { fetchBookByIsbn } from './services/bookService';
+import { ShelvesView } from './components/ShelvesView';
 
 const KEY = 'knihovna_books_v1';
 const SECTION_KEY = 'knihovna_sections_v1';
@@ -74,6 +75,7 @@ export default function App() {
   const [newSection, setNewSection] = useState('');
   const [newShelf, setNewShelf] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [activeView, setActiveView] = useState('catalog');
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(books)); } catch { setMessage('Úložiště prohlížeče je plné nebo nedostupné. Exportujte zálohu.'); } }, [books]);
   useEffect(() => { localStorage.setItem(SECTION_KEY, JSON.stringify(sections)); }, [sections]);
@@ -87,6 +89,8 @@ export default function App() {
   }).sort((a,b) => a.title.localeCompare(b.title, 'cs')), [books, query, statusFilter, sectionFilter]);
 
   const borrowed = books.filter(b => b.status === 'borrowed').length;
+  const shelfCount = shelves.length;
+  const unsortedCount = books.filter(b => !b.shelf).length;
 
   const upsert = book => {
     const finalBook = normalize(book);
@@ -171,10 +175,10 @@ export default function App() {
   const inputStyle = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-stone-900 outline-none focus:ring-2 focus:ring-emerald-700';
   const buttonStyle = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold transition hover:opacity-90';
   return (
-    <div className="min-h-screen bg-[#f7f7f2] text-stone-800">
-      <header className="bg-[#164f46] text-white shadow-sm">
+    <div className="min-h-screen bg-[#f8f7f3] text-stone-800">
+      <header className="bg-[#214c40] text-white shadow-sm">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-7 flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex gap-3 items-center"><LibraryBig size={32}/><div><h1 className="text-2xl font-bold tracking-tight">Knihovní katalog</h1><p className="text-sm text-emerald-100">Jednoduchá evidence knih a výpůjček</p></div></div>
+          <div className="flex gap-3 items-center"><div className="p-2 rounded-2xl bg-white/10"><LibraryBig size={29}/></div><div><h1 className="text-2xl font-bold tracking-tight">Knihovna</h1><p className="text-sm text-emerald-100">Přehled fondu a výpůjček na jednom místě</p></div></div>
           <div className="flex gap-2 flex-wrap">
             <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setShowSettings(v => !v)}>Regály, sekce a zálohy</button>
             <button className={buttonStyle + ' bg-emerald-100 text-emerald-950'} onClick={() => setScanOpen(true)}><ScanLine size={19}/> Skenovat ISBN</button>
@@ -182,13 +186,23 @@ export default function App() {
           </div>
         </div>
       </header>
+      <nav className="bg-white border-b border-stone-200" aria-label="Hlavní navigace"><div className="mx-auto max-w-7xl px-4 sm:px-7 flex gap-2 py-3">
+        <button onClick={()=>setActiveView('catalog')} aria-current={activeView==='catalog'?'page':undefined} className={'px-5 py-3 rounded-xl font-semibold transition ' + (activeView==='catalog'?'bg-[#e7f0e9] text-[#235142]':'text-stone-500 hover:bg-stone-100')}>📚 Knihovní fond</button>
+        <button onClick={()=>setActiveView('shelves')} aria-current={activeView==='shelves'?'page':undefined} className={'px-5 py-3 rounded-xl font-semibold transition ' + (activeView==='shelves'?'bg-[#e7f0e9] text-[#235142]':'text-stone-500 hover:bg-stone-100')}>🗄️ Regály <span className="ml-1 text-xs opacity-70">{shelfCount}</span></button>
+      </div></nav>
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-7 space-y-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 flex items-start gap-2"><AlertTriangle size={19} className="shrink-0 mt-0.5"/><span><b>Lokální evidence:</b> knihy se zatím ukládají jen v tomto prohlížeči a nesynchronizují se mezi počítači. Pro jistotu pravidelně stahujte JSON zálohu. Pro skutečný sdílený provoz knihovny je nutná online databáze a přihlášení.</span></div>
         {message && <div role="status" className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm flex items-center justify-between gap-3"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Zavřít oznámení"><X size={18}/></button></div>}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[[books.length,'Všechny výtisky',BookOpen], [books.length-borrowed,'Dostupné',CheckCircle2], [borrowed,'Vypůjčené',Clock3]].map(([value,label,Icon]) => <div key={label} className="bg-white border border-stone-200 shadow-sm rounded-2xl p-5 flex items-center gap-4"><div className="p-3 bg-emerald-50 rounded-xl text-emerald-800"><Icon size={25}/></div><div><p className="text-sm text-stone-500">{label}</p><p className="text-3xl font-bold">{value}</p></div></div>)}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {[[books.length,'Všechny výtisky',BookOpen], [books.length-borrowed,'Dostupné',CheckCircle2], [borrowed,'Vypůjčené',Clock3], [unsortedCount,'Nezařazené',MapPin]].map(([value,label,Icon]) => <div key={label} className="bg-white border border-stone-200 shadow-sm rounded-3xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4"><div className="p-3 bg-emerald-50 rounded-xl text-emerald-800"><Icon size={25}/></div><div><p className="text-sm text-stone-500">{label}</p><p className="text-3xl font-bold">{value}</p></div></div>)}
         </div>
-        <section className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+        {activeView === 'shelves' && <ShelvesView books={books} shelves={shelves} sections={sections}
+          onAddShelf={name => setShelves(prev => prev.includes(name) ? prev : [...prev, name])}
+          onMoveBook={(id, shelf) => setBooks(prev => prev.map(book => book.id===id ? {...book,shelf} : book))}
+          onEditBook={book => setEditing({...book})} />}
+        {activeView === 'catalog' && <>
+        <section className="bg-white border border-stone-200 rounded-3xl p-5 sm:p-7 shadow-sm">
+          <div className="mb-4"><span className="text-xs uppercase tracking-[.16em] text-emerald-700 font-bold">Rychlé přidání knihy</span></div>
           <h2 className="font-bold text-lg mb-2">Vyhledat knihu podle názvu v knižním katalogu</h2>
           <p className="text-sm text-stone-500 mb-3">Vyhledáváme v Google Books a Open Library. Záznam před uložením ověřte; Databáze knih není přímo propojena.</p>
           <form onSubmit={searchTitles} className="flex flex-col sm:flex-row gap-2"><input className={inputStyle} value={lookup} onChange={e => setLookup(e.target.value)} placeholder="Např. Babička, Harry Potter, Malý princ" aria-label="Název knihy"/><button disabled={loading} className={buttonStyle + ' bg-emerald-800 text-white shrink-0'}><Search size={18}/> {loading ? 'Hledám…' : 'Najít titul'}</button></form>
@@ -201,7 +215,7 @@ export default function App() {
           <div className="border-t border-stone-100 pt-4"><h3 className="font-semibold mb-2">Regály</h3><div className="flex flex-wrap gap-2 mb-3">{shelves.map(sh => <span key={sh} className="bg-emerald-50 text-emerald-900 rounded-lg px-3 py-2 text-sm">{sh} <button title={'Odstranit regál ' + sh} onClick={() => { if(books.some(b=>b.shelf===sh)){setMessage('Regál používají uložené knihy. Nejprve je přesuňte.');return;}setShelves(a=>a.filter(v=>v!==sh)); }} aria-label={'Odstranit ' + sh} className="ml-2">×</button></span>)}</div><form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();const sh=newShelf.trim();if(sh&&!shelves.includes(sh))setShelves(a=>[...a,sh]);setNewShelf('');}}><input className={inputStyle+' max-w-xs'} value={newShelf} onChange={e=>setNewShelf(e.target.value)} placeholder="Např. A3 nebo Regál 5"/><button className={buttonStyle+' bg-emerald-800 text-white'}>Vytvořit regál</button></form></div>
           <div className="flex flex-wrap items-center gap-2"><button className={buttonStyle + ' bg-stone-100'} onClick={exportJson}><Download size={17}/> Záloha JSON</button><button className={buttonStyle + ' bg-stone-100'} onClick={exportCsv}><Download size={17}/> Export CSV</button><label className={buttonStyle + ' bg-stone-100 cursor-pointer'}><Upload size={17}/> Importovat JSON<input className="sr-only" type="file" accept=".json,application/json" onChange={importJson}/></label></div>
         </section>}
-        <section className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
+        <section className="bg-white border border-stone-200 rounded-3xl shadow-sm overflow-hidden">
           <div className="p-5 border-b border-stone-100"><div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 className="text-xl font-bold">Knihovní fond <span className="text-stone-400 text-base font-normal">({filtered.length})</span></h2><button className={buttonStyle + ' bg-emerald-50 text-emerald-900'} onClick={() => setIsbnOpen(true)}><ScanLine size={17}/> Zadat ISBN ručně</button></div>
           <div className="grid sm:grid-cols-[1fr_auto_auto] gap-2"><label className="relative"><Search className="absolute left-3 top-3 text-stone-400" size={19}/><input className={inputStyle + ' pl-10'} placeholder="Hledat název, autora, ISBN, regál…" value={query} onChange={e => setQuery(e.target.value)}/></label>
             <select className={inputStyle} value={sectionFilter} onChange={e => setSectionFilter(e.target.value)} aria-label="Filtrovat sekci"><option value="all">Všechny sekce</option>{sections.map(s=><option key={s}>{s}</option>)}</select>
@@ -214,8 +228,9 @@ export default function App() {
             <div className="flex flex-wrap items-center gap-2"><button title="Kliknutím přepnete dostupnost výtisku" onClick={() => setEditing({...book, status:book.status==='borrowed'?'available':'borrowed', borrower:book.status==='borrowed'?'':book.borrower, borrowedAt:book.status==='borrowed'?'':(book.borrowedAt||new Date().toISOString().slice(0,10))})} className={'rounded-full px-3 py-2 text-sm font-bold ' + (book.status==='borrowed'?'bg-amber-100 text-amber-900':'bg-emerald-100 text-emerald-900')}>{book.status === 'borrowed' ? 'Vypůjčeno' : 'Dostupné'} ↔</button><button className="rounded-lg p-2 text-stone-600 hover:bg-stone-200" title="Upravit knihu" onClick={()=>setEditing({...book})}><Pencil size={19}/></button><button className="rounded-lg p-2 text-red-700 hover:bg-red-50" title="Smazat výtisk" onClick={()=>{if(window.confirm('Opravdu odstranit tento výtisk?'))setBooks(a=>a.filter(b=>b.id!==book.id));}}><Trash2 size={19}/></button></div>
           </article>)}</div>}
         </section>
+        </>}
       </main>
-      <footer className="text-center text-stone-500 text-xs p-6">Knihovní katalog · Pracovní verze evidence knih</footer>
+      <footer className="text-center text-stone-500 text-xs p-6">Knihovna · Přehledná evidence knih a regálů · Pracovní verze</footer>
       <BarcodeScannerModal isOpen={scanOpen} onClose={()=>setScanOpen(false)} onDetected={processIsbn}/>
       <ManualIsbnModal isOpen={isbnOpen} onClose={()=>setIsbnOpen(false)} onSubmitIsbn={processIsbn}/>
       {editing && <div className="fixed inset-0 z-50 bg-stone-950/60 p-3 sm:p-6 overflow-y-auto flex items-start justify-center" role="dialog" aria-modal="true" aria-label="Údaje výtisku"><form onSubmit={e=>{e.preventDefault();upsert(editing);}} className="w-full max-w-3xl bg-white rounded-2xl p-5 sm:p-7 my-5 shadow-2xl space-y-4">
