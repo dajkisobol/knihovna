@@ -1,104 +1,102 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { X, Camera, AlertCircle } from 'lucide-react';
+import { X, Camera, AlertCircle, Keyboard } from 'lucide-react';
 
-export function BarcodeScannerModal({ isOpen, onClose, onDetected }) {
+function extractIsbn(value) {
+  const text = String(value || '').trim();
+  // QR codes can contain plain ISBN, an ISBN-labelled field, or a URL with isbn=...
+  const candidates = [
+    text.match(/(?:ISBN(?:-1[03])?\s*[:=\s]*)(97[89][\d\s-]{10,20}|[\d\s-]{9,16}[\dXx])/i)?.[1],
+    text.match(/[?&]isbn(?:13|10)?=([^&#]+)/i)?.[1],
+    text
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const raw = candidate.replace(/[^\dXx]/g, '').toUpperCase();
+    if (/^\d{13}$/.test(raw) || /^\d{9}[\dX]$/.test(raw)) return raw;
+    const embedded = candidate.match(/(?:97[89][\d-]{10,17}|\d[\d-]{8,16}[\dXx])/);
+    if (embedded) {
+      const compact = embedded[0].replace(/-/g, '').toUpperCase();
+      if (/^\d{13}$/.test(compact) || /^\d{9}[\dX]$/.test(compact)) return compact;
+    }
+  }
+  return '';
+}
+
+export function BarcodeScannerModal({ isOpen, onClose, onDetected, onManual }) {
   const scannerRef = useRef(null);
-  const [scanError, setScanError] = useState(null);
+  const detectedRef = useRef(onDetected);
+  const processed = useRef(false);
+  const [scanError, setScanError] = useState('');
+  useEffect(() => { detectedRef.current = onDetected; }, [onDetected]);
 
   useEffect(() => {
-    if (!isOpen) {
-      setScanError(null);
-      return;
-    }
-
+    if (!isOpen) { processed.current = false; return; }
+    let cancelled = false;
+    processed.current = false;
+    // A new id per mounted scanner avoids clashing with previous teardown.
     const timer = setTimeout(() => {
-      const config = {
-        fps: 10,
-        qrbox: { width: 280, height: 160 },
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.CODE_128
-        ]
-      };
-
+      if (cancelled) return;
       try {
-        const scanner = new Html5QrcodeScanner('reader', config, /* verbose= */ false);
+        if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+          setScanError('Kamera vyžaduje zabezpečenou stránku HTTPS. Otevřete aplikaci přes HTTPS.');
+          return;
+        }
+        const scanner = new Html5QrcodeScanner('isbn-reader', {
+          fps: 10,
+          qrbox: (viewWidth, viewHeight) => ({
+            width: Math.min(280, Math.max(140, Math.floor(viewWidth * .75))),
+            height: Math.min(180, Math.max(110, Math.floor(viewHeight * .55)))
+          }),
+          rememberLastUsedCamera: true,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E
+          ]
+        }, false);
         scannerRef.current = scanner;
-
-        scanner.render(
-          (decodedText) => {
-            if (scannerRef.current) {
-              scannerRef.current.clear().catch(console.error);
-            }
-            onDetected(decodedText);
-          },
-          (_errorMessage) => {
-            // Ignore normal non-detection frames
+        scanner.render(text => {
+          if (processed.current) return;
+          const isbn = extractIsbn(text);
+          if (!isbn) {
+            setScanError('Kód byl přečten, ale neobsahuje ISBN-10 ani ISBN-13. Zkuste čárový kód knihy nebo ruční zadání.');
+            return;
           }
-        );
+          processed.current = true;
+          setScanError('');
+          detectedRef.current(isbn);
+        }, () => {});
       } catch (err) {
-        console.error('Failed to initialize barcode scanner:', err);
-        setScanError('Nepodařilo se spustit kameru. Ujistěte se, že máte povolen přístup ke kameře.');
+        console.error('Scanner init error:', err);
+        setScanError('Kameru se nepodařilo spustit. Zkontrolujte oprávnění fotoaparátu nebo zadejte ISBN ručně.');
       }
-    }, 100);
-
+    }, 150);
     return () => {
+      cancelled = true;
       clearTimeout(timer);
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch((err) => {
-          console.warn('Error clearing html5QrcodeScanner:', err);
-        });
-        scannerRef.current = null;
-      }
+      const instance = scannerRef.current;
+      scannerRef.current = null;
+      if (instance) Promise.resolve(instance.clear()).catch(() => {});
     };
-  }, [isOpen, onDetected]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-[#fbf9f5] rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-emerald-200 relative animate-in fade-in zoom-in-95 duration-200">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200/60 text-stone-500 hover:text-stone-800 transition cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="p-2.5 bg-emerald-100 text-emerald-950 rounded-xl border border-emerald-200">
-            <Camera className="w-5 h-5 text-emerald-800" />
-          </div>
-          <div>
-            <h3 className="text-lg font-serif font-semibold text-stone-900">Naskenovat čárový kód (ISBN)</h3>
-            <p className="text-xs text-stone-600">Namiřte kameru na EAN / ISBN čárový kód na zadní straně knihy</p>
-          </div>
-        </div>
-
-        {scanError ? (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-900 text-sm flex items-start space-x-2 my-4">
-            <AlertCircle className="w-5 h-5 text-red-700 shrink-0 mt-0.5" />
-            <span>{scanError}</span>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-emerald-300 bg-stone-900 my-3">
-            <div id="reader" className="w-full text-white"></div>
-          </div>
-        )}
-
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm bg-stone-200 hover:bg-stone-300 text-stone-800 font-medium transition cursor-pointer"
-          >
-            Zavřít
-          </button>
-        </div>
+  return <div className="fixed inset-0 z-50 bg-stone-900/60 flex items-center justify-center p-4">
+    <div className="bg-[#fbf9f5] rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-emerald-200 relative">
+      <button type="button" aria-label="Zavřít" onClick={onClose} className="absolute top-4 right-4 p-2 text-stone-500 hover:text-stone-900"><X size={21}/></button>
+      <div className="flex gap-3 items-center mb-4"><div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl"><Camera size={22}/></div>
+        <div><h2 className="text-lg font-bold">Naskenovat QR nebo ISBN</h2><p className="text-xs text-stone-600">Povolte kameru a zamiřte na QR kód nebo čárový kód ISBN na knize.</p></div>
+      </div>
+      <div className="bg-white border border-stone-200 rounded-xl overflow-hidden min-h-24"><div id="isbn-reader" className="w-full"/></div>
+      {scanError && <div role="alert" className="mt-3 p-3 rounded-xl text-sm flex gap-2 bg-amber-50 border border-amber-200 text-amber-950"><AlertCircle className="shrink-0" size={18}/>{scanError}</div>}
+      <p className="mt-3 text-xs text-stone-500">V prohlížeči je nutné povolit přístup ke kameře. QR kód musí obsahovat ISBN knihy.</p>
+      <div className="flex justify-end flex-wrap gap-2 mt-5">
+        <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 bg-stone-100">Zavřít</button>
+        <button type="button" onClick={onManual} className="rounded-xl px-4 py-2 bg-emerald-800 text-white font-semibold inline-flex items-center gap-2"><Keyboard size={18}/> Zadat ISBN ručně</button>
       </div>
     </div>
-  );
+  </div>;
 }
