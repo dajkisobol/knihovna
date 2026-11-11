@@ -249,22 +249,28 @@ export default function App() {
   const buttonStyle = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold transition hover:opacity-90';
   return (
     <div className="min-h-screen bg-[#f8f7f3] text-stone-800">
-      <header className="bg-[#214c40] text-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-7 flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex gap-3 items-center"><div className="p-2 rounded-2xl bg-white/10"><LibraryBig size={29}/></div><div><h1 className="text-2xl font-bold tracking-tight">Knihovna</h1><p className="text-sm text-emerald-100">Přehled fondu a výpůjček na jednom místě</p></div></div>
-          <div className="flex gap-2 flex-wrap">
-            <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setShowSettings(v => !v)}>Nastavení</button>
-            <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setAccountOpen(true)}>{cloudUser ? '● ' + (cloudUser.email || 'Účet') : 'Přihlášení'}</button>
-            <button className={buttonStyle + ' bg-emerald-100 text-emerald-950'} onClick={() => setScanOpen(true)}><ScanLine size={19}/> Skenovat QR / ISBN</button>
-            <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setIsbnOpen(true)}>⌨ Zadat ISBN</button>
-            <button className={buttonStyle + ' bg-white text-emerald-900'} onClick={() => setEditing(emptyBook())}><Plus size={19}/> Přidat knihu</button>
+      <header className="bg-[#193c34] text-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-7 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-[#315a4e] p-3"><LibraryBig size={27}/></div>
+            <div><p className="text-[11px] tracking-[.18em] uppercase text-emerald-200">Správa knihovny</p><h1 className="text-2xl font-bold tracking-tight">Knihovní systém</h1></div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="rounded-xl px-4 py-2.5 text-sm font-semibold border border-white/20 hover:bg-white/10" onClick={()=>setAccountOpen(true)}>{cloudUser ? '☁ ' + (cloudUser.email || 'Můj účet') : 'Přihlásit se'}</button>
+            <button className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-[#214b3e] hover:bg-stone-100 flex items-center gap-2" onClick={()=>setScanOpen(true)}><ScanLine size={18}/> Skenovat</button>
+            <button className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-[#d6e7d2] text-[#193c34] hover:bg-[#c4ddbf] flex items-center gap-2" onClick={()=>setIsbnOpen(true)}>⌨ ISBN ručně</button>
           </div>
         </div>
       </header>
-      <nav className="bg-white border-b border-stone-200" aria-label="Hlavní navigace"><div className="mx-auto max-w-7xl px-4 sm:px-7 flex gap-2 py-3">
-        <button onClick={()=>setActiveView('catalog')} aria-current={activeView==='catalog'?'page':undefined} className={'px-5 py-3 rounded-xl font-semibold transition ' + (activeView==='catalog'?'bg-[#e7f0e9] text-[#235142]':'text-stone-500 hover:bg-stone-100')}>📚 Knihovní fond</button>
-        <button onClick={()=>setActiveView('shelves')} aria-current={activeView==='shelves'?'page':undefined} className={'px-5 py-3 rounded-xl font-semibold transition ' + (activeView==='shelves'?'bg-[#e7f0e9] text-[#235142]':'text-stone-500 hover:bg-stone-100')}>🗄️ Regály <span className="ml-1 text-xs opacity-70">{shelfCount}</span></button>
-      </div></nav>
+      <nav className="bg-white border-b border-stone-200 shadow-sm" aria-label="Hlavní navigace">
+        <div className="mx-auto max-w-7xl px-4 sm:px-7 py-2 flex flex-wrap gap-2 items-center">
+          <button onClick={()=>setActiveView('catalog')} aria-current={activeView==='catalog'?'page':undefined} className={'px-4 py-3 rounded-xl text-sm font-semibold transition ' + (activeView==='catalog'?'bg-[#e5efe7] text-[#214d3b]':'text-stone-500 hover:bg-stone-100')}>Knihovní fond</button>
+          <button onClick={()=>setActiveView('shelves')} aria-current={activeView==='shelves'?'page':undefined} className={'px-4 py-3 rounded-xl text-sm font-semibold transition ' + (activeView==='shelves'?'bg-[#e5efe7] text-[#214d3b]':'text-stone-500 hover:bg-stone-100')}>Regály <span className="opacity-60">{shelfCount}</span></button>
+          <div className="flex-1"/>
+          <button onClick={()=>setEditing(emptyBook())} className="px-4 py-3 rounded-xl text-sm font-semibold text-emerald-800 hover:bg-emerald-50 flex items-center gap-1"><Plus size={17}/> Nová kniha</button>
+          <button onClick={()=>{setActiveView('catalog');setShowSettings(v=>!v);}} className="px-4 py-3 rounded-xl text-sm font-semibold text-stone-500 hover:bg-stone-100">Nastavení</button>
+        </div>
+      </nav>
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-7 space-y-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 flex items-start gap-2"><AlertTriangle size={19} className="shrink-0 mt-0.5"/><span><b>Lokální evidence:</b> knihy se zatím ukládají jen v tomto prohlížeči a nesynchronizují se mezi počítači. Pro jistotu pravidelně stahujte JSON zálohu. Pro skutečný sdílený provoz knihovny je nutná online databáze a přihlášení.</span></div>
         {cloudUser && <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 flex flex-wrap justify-between gap-2 items-center text-sm">
