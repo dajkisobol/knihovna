@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { BookOpen, ScanLine, Search, Plus, Download, Upload, CheckCircle2, Clock3, MapPin, Pencil, Trash2, X, LibraryBig, AlertTriangle } from 'lucide-react';
 import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { ManualIsbnModal } from './components/ManualIsbnModal';
 import { fetchBookByIsbn } from './services/bookService';
 import { ShelvesView } from './components/ShelvesView';
+import { AccountModal } from './components/AccountModal';
+import { cloudEnabled, supabase } from './services/cloud';
 
 const KEY = 'knihovna_books_v1';
 const SECTION_KEY = 'knihovna_sections_v1';
@@ -76,10 +78,79 @@ export default function App() {
   const [newShelf, setNewShelf] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [activeView, setActiveView] = useState('catalog');
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [cloudUser, setCloudUser] = useState(null);
+  const [cloudReady, setCloudReady] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState('local');
+  const [hasCloudData, setHasCloudData] = useState(false);
+  const cloudRevision = useRef(0);
+  const localSnapshot = useRef({books: loadBooks(), sections: loadSections(), shelves: loadShelves()});
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(books)); } catch { setMessage('Úložiště prohlížeče je plné nebo nedostupné. Exportujte zálohu.'); } }, [books]);
   useEffect(() => { localStorage.setItem(SECTION_KEY, JSON.stringify(sections)); }, [sections]);
   useEffect(() => { localStorage.setItem(SHELF_KEY, JSON.stringify(shelves)); }, [shelves]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let live = true;
+    const loadAccount = async session => {
+      const user = session?.user || null;
+      if (!live) return;
+      setCloudReady(false);
+      setCloudUser(user);
+      if (!user) { setCloudStatus('local'); setHasCloudData(false); setCloudReady(false); return; }
+      setCloudStatus('loading');
+      const { data, error } = await supabase.from('library_data').select('books, sections, shelves').eq('user_id', user.id).maybeSingle();
+      if (!live) return;
+      if (error) { setCloudStatus('error'); setMessage('Cloud: ' + error.message); return; }
+      if (data) {
+        setBooks(Array.isArray(data.books) ? data.books.map(normalize) : []);
+        setSections(Array.isArray(data.sections) ? data.sections : DEFAULT_SECTIONS);
+        setShelves(Array.isArray(data.shelves) ? data.shelves : DEFAULT_SHELVES);
+        setHasCloudData(true);
+        setCloudStatus('saved');
+      } else {
+        setBooks([]);
+        setSections(DEFAULT_SECTIONS);
+        setShelves(DEFAULT_SHELVES);
+        setHasCloudData(false);
+        setCloudStatus('empty');
+      }
+      cloudRevision.current += 1;
+      setCloudReady(true);
+    };
+    supabase.auth.getSession().then(({data}) => loadAccount(data.session)).catch(()=>setCloudStatus('error'));
+    const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session) => {
+      // schedule outside the auth callback to avoid Supabase client deadlocks
+      setTimeout(()=>{ if(live) loadAccount(session); }, 0);
+    });
+    return () => {live = false;subscription.unsubscribe();};
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !cloudUser || !cloudReady) return;
+    // Debounced sync for edits; delete is intentionally persisted too.
+    setCloudStatus('saving');
+    const currentRevision = ++cloudRevision.current;
+    const timer = setTimeout(async () => {
+      const { error } = await supabase.from('library_data').upsert({
+        user_id: cloudUser.id, books, shelves, sections, updated_at: new Date().toISOString()
+      }, {onConflict: 'user_id'});
+      if (cloudRevision.current !== currentRevision) return;
+      if (error) { setCloudStatus('error'); setMessage('Nepodařilo se uložit online: ' + error.message); }
+      else {setCloudStatus('saved');setHasCloudData(true);}
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [cloudUser, cloudReady, books, sections, shelves]);
+
+  const importLocalToCloud = () => {
+    if (!cloudUser || hasCloudData) return;
+    if (!window.confirm('Nahrát místní knihy do tohoto online účtu? Tím vytvoříte nový katalog pro přihlášený účet.')) return;
+    setBooks(localSnapshot.current.books);
+    setSections(localSnapshot.current.sections);
+    setShelves(localSnapshot.current.shelves);
+    setCloudStatus('saving');
+  };
 
   const filtered = useMemo(() => books.filter(b => {
     const text = [b.title, b.authors, b.isbn, b.section, b.shelf, b.note, b.borrower].join(' ').toLocaleLowerCase('cs');
@@ -180,7 +251,8 @@ export default function App() {
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-7 flex flex-wrap gap-4 items-center justify-between">
           <div className="flex gap-3 items-center"><div className="p-2 rounded-2xl bg-white/10"><LibraryBig size={29}/></div><div><h1 className="text-2xl font-bold tracking-tight">Knihovna</h1><p className="text-sm text-emerald-100">Přehled fondu a výpůjček na jednom místě</p></div></div>
           <div className="flex gap-2 flex-wrap">
-            <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setShowSettings(v => !v)}>Regály, sekce a zálohy</button>
+            <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setShowSettings(v => !v)}>Nastavení</button>
+            <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setAccountOpen(true)}>{cloudUser ? '● ' + (cloudUser.email || 'Účet') : 'Přihlášení'}</button>
             <button className={buttonStyle + ' bg-emerald-100 text-emerald-950'} onClick={() => setScanOpen(true)}><ScanLine size={19}/> Skenovat QR / ISBN</button>
             <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setIsbnOpen(true)}>⌨ Zadat ISBN</button>
             <button className={buttonStyle + ' bg-white text-emerald-900'} onClick={() => setEditing(emptyBook())}><Plus size={19}/> Přidat knihu</button>
@@ -193,6 +265,10 @@ export default function App() {
       </div></nav>
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-7 space-y-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 flex items-start gap-2"><AlertTriangle size={19} className="shrink-0 mt-0.5"/><span><b>Lokální evidence:</b> knihy se zatím ukládají jen v tomto prohlížeči a nesynchronizují se mezi počítači. Pro jistotu pravidelně stahujte JSON zálohu. Pro skutečný sdílený provoz knihovny je nutná online databáze a přihlášení.</span></div>
+        {cloudUser && <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 flex flex-wrap justify-between gap-2 items-center text-sm">
+          <span>☁ Online účet: <strong>{cloudUser.email}</strong> · {cloudStatus === 'saved' ? 'Uloženo online' : cloudStatus === 'saving' ? 'Ukládám…' : cloudStatus === 'loading' ? 'Načítám…' : cloudStatus === 'empty' ? 'Prázdný online katalog' : cloudStatus === 'error' ? 'Chyba synchronizace' : 'Připraveno'}</span>
+          {!hasCloudData && cloudReady && <button onClick={importLocalToCloud} className="bg-emerald-800 text-white rounded-lg px-3 py-2">Nahrát původní místní knihy</button>}
+        </div>}
         {message && <div role="status" className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm flex items-center justify-between gap-3"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Zavřít oznámení"><X size={18}/></button></div>}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[[books.length,'Všechny výtisky',BookOpen], [books.length-borrowed,'Dostupné',CheckCircle2], [borrowed,'Vypůjčené',Clock3], [unsortedCount,'Nezařazené',MapPin]].map(([value,label,Icon]) => <div key={label} className="bg-white border border-stone-200 shadow-sm rounded-3xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4"><div className="p-3 bg-emerald-50 rounded-xl text-emerald-800"><Icon size={25}/></div><div><p className="text-sm text-stone-500">{label}</p><p className="text-3xl font-bold">{value}</p></div></div>)}
@@ -206,6 +282,7 @@ export default function App() {
           <div className="mb-4"><span className="text-xs uppercase tracking-[.16em] text-emerald-700 font-bold">Rychlé přidání knihy</span></div>
           <h2 className="font-bold text-lg mb-2">Vyhledat knihu podle názvu v knižním katalogu</h2>
           <p className="text-sm text-stone-500 mb-3">Vyhledáváme v Google Books a Open Library. Záznam před uložením ověřte; Databáze knih není přímo propojena.</p>
+          <div className="mb-4 rounded-xl bg-[#f7f6f1] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"><span className="text-sm text-stone-600">Hledáte titul v české Databázi knih?</span><a className="text-sm font-semibold text-emerald-900 underline" href={'https://www.databazeknih.cz/search?q='+encodeURIComponent(lookup)} target="_blank" rel="noopener noreferrer">Otevřít hledání na Databázi knih ↗</a></div>
           <form onSubmit={searchTitles} className="flex flex-col sm:flex-row gap-2"><input className={inputStyle} value={lookup} onChange={e => setLookup(e.target.value)} placeholder="Např. Babička, Harry Potter, Malý princ" aria-label="Název knihy"/><button disabled={loading} className={buttonStyle + ' bg-emerald-800 text-white shrink-0'}><Search size={18}/> {loading ? 'Hledám…' : 'Najít titul'}</button></form>
           {!!lookupResults.length && <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">{lookupResults.map(item => <div key={item.id} className="border border-stone-200 rounded-xl p-3 flex gap-3 items-start">{item.coverUrl ? <img src={item.coverUrl} alt="" className="w-14 h-20 object-cover rounded" /> : <div className="w-14 h-20 bg-stone-100 rounded shrink-0"/>}<div className="min-w-0"><p className="font-semibold text-sm">{item.title}</p><p className="text-xs text-stone-500">{item.authors}</p><button className="text-emerald-800 underline text-sm mt-2" onClick={() => setEditing(normalize({ ...item, id: createId(), section: 'Beletrie' }))}>Přidat výtisk</button></div></div>)}</div>}
         </section>
@@ -232,6 +309,7 @@ export default function App() {
         </>}
       </main>
       <footer className="text-center text-stone-500 text-xs p-6">Knihovna · Přehledná evidence knih a regálů · Pracovní verze</footer>
+      <AccountModal open={accountOpen} user={cloudUser} onClose={()=>setAccountOpen(false)} onLogout={async()=>{await supabase.auth.signOut();setAccountOpen(false);window.location.reload();}}/>
       <BarcodeScannerModal isOpen={scanOpen} onClose={()=>setScanOpen(false)} onDetected={processIsbn} onManual={() => {setScanOpen(false);setIsbnOpen(true);}}/>
       <ManualIsbnModal isOpen={isbnOpen} onClose={()=>setIsbnOpen(false)} onSubmitIsbn={processIsbn}/>
       {editing && <div className="fixed inset-0 z-50 bg-stone-950/60 p-3 sm:p-6 overflow-y-auto flex items-start justify-center" role="dialog" aria-modal="true" aria-label="Údaje výtisku"><form onSubmit={e=>{e.preventDefault();upsert(editing);}} className="w-full max-w-3xl bg-white rounded-2xl p-5 sm:p-7 my-5 shadow-2xl space-y-4">
