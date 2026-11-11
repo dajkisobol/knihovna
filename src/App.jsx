@@ -181,7 +181,8 @@ export default function App() {
           <div className="flex gap-3 items-center"><div className="p-2 rounded-2xl bg-white/10"><LibraryBig size={29}/></div><div><h1 className="text-2xl font-bold tracking-tight">Knihovna</h1><p className="text-sm text-emerald-100">Přehled fondu a výpůjček na jednom místě</p></div></div>
           <div className="flex gap-2 flex-wrap">
             <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setShowSettings(v => !v)}>Regály, sekce a zálohy</button>
-            <button className={buttonStyle + ' bg-emerald-100 text-emerald-950'} onClick={() => setScanOpen(true)}><ScanLine size={19}/> Skenovat ISBN</button>
+            <button className={buttonStyle + ' bg-emerald-100 text-emerald-950'} onClick={() => setScanOpen(true)}><ScanLine size={19}/> Skenovat QR / ISBN</button>
+            <button className={buttonStyle + ' bg-white/15 text-white'} onClick={() => setIsbnOpen(true)}>⌨ Zadat ISBN</button>
             <button className={buttonStyle + ' bg-white text-emerald-900'} onClick={() => setEditing(emptyBook())}><Plus size={19}/> Přidat knihu</button>
           </div>
         </div>
@@ -231,7 +232,7 @@ export default function App() {
         </>}
       </main>
       <footer className="text-center text-stone-500 text-xs p-6">Knihovna · Přehledná evidence knih a regálů · Pracovní verze</footer>
-      <BarcodeScannerModal isOpen={scanOpen} onClose={()=>setScanOpen(false)} onDetected={processIsbn}/>
+      <BarcodeScannerModal isOpen={scanOpen} onClose={()=>setScanOpen(false)} onDetected={processIsbn} onManual={() => {setScanOpen(false);setIsbnOpen(true);}}/>
       <ManualIsbnModal isOpen={isbnOpen} onClose={()=>setIsbnOpen(false)} onSubmitIsbn={processIsbn}/>
       {editing && <div className="fixed inset-0 z-50 bg-stone-950/60 p-3 sm:p-6 overflow-y-auto flex items-start justify-center" role="dialog" aria-modal="true" aria-label="Údaje výtisku"><form onSubmit={e=>{e.preventDefault();upsert(editing);}} className="w-full max-w-3xl bg-white rounded-2xl p-5 sm:p-7 my-5 shadow-2xl space-y-4">
         <div className="flex justify-between items-center"><h2 className="text-xl font-bold">Údaje výtisku</h2><button type="button" onClick={()=>setEditing(null)} aria-label="Zavřít"><X/></button></div>
