@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRightLeft, BookOpen, Check, FolderPlus, LibraryBig, Search, X } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, BookOpen, FolderPlus, LibraryBig, Search, Plus, X } from 'lucide-react';
 
 const SPINE_COLORS = ['#416b61', '#a97457', '#64839b', '#826b91', '#c49855', '#567b79', '#956e6a'];
 const colorFor = (book) => SPINE_COLORS[Array.from(book.title || '').reduce((sum, char) => sum + char.charCodeAt(0), 0) % SPINE_COLORS.length];
@@ -9,8 +9,11 @@ export function ShelvesView({ books, shelves, sections, onAddShelf, onMoveBook, 
   const [newShelf, setNewShelf] = useState('');
   const [query, setQuery] = useState('');
   const [section, setSection] = useState('all');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
   const shelfNames = useMemo(() => [...shelves, ...(books.some(book => !book.shelf) ? [''] : [])], [shelves, books]);
   const currentShelf = shelfNames.includes(activeShelf) ? activeShelf : null;
+  const unassignedBooks = useMemo(() => books.filter(book => !book.shelf && [book.title, book.authors, book.isbn].join(' ').toLocaleLowerCase('cs').includes(pickerQuery.toLocaleLowerCase('cs'))).sort((a,b) => a.title.localeCompare(b.title,'cs')), [books,pickerQuery]);
   const visibleBooks = useMemo(() => books
     .filter(book => currentShelf !== null && (book.shelf || '') === currentShelf)
     .filter(book => section === 'all' || book.section === section)
@@ -42,7 +45,7 @@ export function ShelvesView({ books, shelves, sections, onAddShelf, onMoveBook, 
       <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
         {shelfNames.map(name => {
           const items = books.filter(book => (book.shelf || '') === name);
-          return <button key={name || '__unsorted'} onClick={() => {setActiveShelf(name); setQuery(''); setSection('all');}}
+          return <button key={name || '__unsorted'} onClick={() => {setActiveShelf(name); setQuery(''); setSection('all');setPickerOpen(false);}}
             className="group text-left rounded-3xl bg-white border border-stone-200 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all focus:outline-none focus:ring-4 focus:ring-emerald-200">
             <div className="p-5 pb-3 flex items-center justify-between">
               <div><span className="text-xs uppercase font-semibold tracking-wider text-stone-400">Knihovní regál</span><h3 className="text-2xl font-bold text-[#25473f]">{name || 'Nezařazené knihy'}</h3></div>
@@ -61,11 +64,16 @@ export function ShelvesView({ books, shelves, sections, onAddShelf, onMoveBook, 
       </div>
     </> : <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button onClick={() => setActiveShelf(null)} className="flex items-center gap-2 text-emerald-900 font-semibold hover:underline"><ArrowLeft size={18}/> Všechny regály</button>
+        <button onClick={() => {setActiveShelf(null);setPickerOpen(false);}} className="flex items-center gap-2 text-emerald-900 font-semibold hover:underline"><ArrowLeft size={18}/> Všechny regály</button>
         <span className="text-sm text-stone-500">{visibleBooks.length} záznamů</span>
       </div>
       <div className="rounded-3xl bg-white border border-stone-200 p-5 md:p-7 shadow-sm">
-        <div className="flex gap-4 items-center mb-5"><div className="bg-[#e7efe8] p-4 rounded-2xl text-emerald-800"><LibraryBig size={28}/></div><div><p className="text-sm text-stone-500">Právě prohlížíte regál</p><h2 className="text-3xl font-bold text-[#25473f]">{currentShelf || 'Nezařazené knihy'}</h2></div></div>
+        <div className="flex flex-wrap gap-3 items-center justify-between mb-5"><div className="flex gap-4 items-center"><div className="bg-[#e7efe8] p-4 rounded-2xl text-emerald-800"><LibraryBig size={28}/></div><div><p className="text-sm text-stone-500">Právě prohlížíte regál</p><h2 className="text-3xl font-bold text-[#25473f]">{currentShelf || 'Nezařazené knihy'}</h2></div></div>{currentShelf !== '' && <button type="button" onClick={()=>{setPickerOpen(v=>!v);setPickerQuery('');}} aria-expanded={pickerOpen} className="flex items-center gap-2 rounded-xl bg-emerald-800 text-white px-4 py-3 font-semibold hover:bg-emerald-900"><Plus size={18}/> Přidat knihu</button>}</div>
+        {currentShelf !== '' && pickerOpen && <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
+          <div className="flex justify-between gap-3 items-start"><div><h3 className="font-bold text-emerald-950">Přidat do regálu {currentShelf}</h3><p className="text-xs text-stone-600 mt-1">Zobrazují se pouze výtisky, které ještě nejsou v žádném regálu. Knihy se nekopírují, jen se jim nastaví umístění.</p></div><button type="button" onClick={()=>setPickerOpen(false)} aria-label="Zavřít výběr knih" className="p-2 rounded-lg hover:bg-emerald-100"><X size={18}/></button></div>
+          <label className="block mt-3"><span className="sr-only">Hledat nezařazené knihy</span><input value={pickerQuery} onChange={e=>setPickerQuery(e.target.value)} placeholder="Najít nezařazený výtisk podle názvu, autora nebo ISBN…" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-3 outline-none focus:ring-2 focus:ring-emerald-600"/></label>
+          <div className="mt-3 max-h-72 overflow-auto space-y-2" aria-live="polite">{!unassignedBooks.length ? <p className="text-sm text-stone-600 py-3">{books.some(book=>!book.shelf)?'Žádný nezařazený výtisk neodpovídá hledání.':'Všechny knihy už mají přiřazený regál.'}</p> : unassignedBooks.map(book=><div key={book.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white border border-stone-100 px-3 py-2"><div className="min-w-0"><p className="text-sm font-semibold">{book.title}</p><p className="text-xs text-stone-500">{book.authors || 'Autor neuveden'}{book.isbn ? ' · '+book.isbn : ''}</p></div><button type="button" className="rounded-lg bg-emerald-800 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-900" onClick={()=>onMoveBook(book.id,currentShelf)}>+ Do regálu</button></div>)}</div>
+        </div>}
         <div className="grid md:grid-cols-[1fr_220px] gap-3 mb-7">
           <label className="relative"><Search size={18} className="absolute left-3 top-3.5 text-stone-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Najít knihu v regálu…" className="w-full rounded-xl border border-stone-200 p-3 pl-10 focus:ring-2 focus:ring-emerald-600 focus:outline-none"/></label>
           <select aria-label="Sekce v regálu" className="rounded-xl border border-stone-200 p-3 bg-white" value={section} onChange={e=>setSection(e.target.value)}><option value="all">Všechny sekce</option>{sections.map(s=><option key={s} value={s}>{s}</option>)}</select>
@@ -75,6 +83,7 @@ export function ShelvesView({ books, shelves, sections, onAddShelf, onMoveBook, 
             {visibleBooks.map(book => <article key={book.id} className="rounded-2xl border border-stone-200 p-4 flex gap-4 items-center bg-[#fcfbf8]">
               {book.coverUrl ? <img src={book.coverUrl} alt="" className="h-24 w-16 object-cover rounded-md shadow-sm" onError={e=>{e.currentTarget.style.display='none';}}/> : <div className="h-24 w-16 shrink-0 rounded-md flex items-center justify-center text-white" style={{backgroundColor:colorFor(book)}}><BookOpen size={25}/></div>}
               <div className="min-w-0 flex-1"><h3 className="font-semibold text-[#243d35] leading-tight">{book.title}</h3><p className="text-xs text-stone-500 mt-1">{book.authors || 'Autor neuveden'}</p><span className={'inline-block mt-2 text-xs font-semibold rounded-full px-2 py-1 ' + (book.status==='borrowed'?'bg-amber-100 text-amber-900':'bg-emerald-100 text-emerald-900')}>{book.status==='borrowed'?'Vypůjčeno':'Dostupné'}</span>
+                <details className="mt-2 text-xs text-stone-600"><summary className="cursor-pointer font-semibold text-emerald-800">Zobrazit více o knize</summary><div className="mt-2 space-y-1"><p>ISBN: {book.isbn || 'Neuvedeno'}</p><p>Sekce: {book.section || 'Neuvedena'}</p>{book.publisher && <p>Nakladatelství: {book.publisher}</p>}{book.publishedDate && <p>Vydání: {book.publishedDate}</p>}{book.description && <p className="mt-2 leading-relaxed">{book.description}</p>}</div></details>
                 <div className="mt-3 flex flex-wrap items-center gap-2"><button className="text-sm font-semibold text-emerald-800 hover:underline" onClick={()=>onEditBook(book)}>Upravit</button><label className="flex items-center gap-1 text-xs text-stone-500"><ArrowRightLeft size={14}/><span className="sr-only">Přesunout do regálu</span><select aria-label={'Přesunout knihu ' + book.title} value={book.shelf||''} onChange={e=>onMoveBook(book.id,e.target.value)} className="max-w-32 rounded-md border border-stone-200 bg-white py-1 px-1 text-stone-800"><option value="">Nezařazeno</option>{shelves.map(name=><option key={name} value={name}>{name}</option>)}</select></label></div>
               </div>
             </article>)}
