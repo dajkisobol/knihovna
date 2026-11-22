@@ -311,7 +311,7 @@ export default function App() {
         <section className="relative overflow-hidden rounded-[2rem] bg-[#173b32] p-6 sm:p-9 text-white shadow-xl">
           <div className="pointer-events-none absolute -right-14 -top-24 h-72 w-72 rounded-full border-[35px] border-white/5"/>
           <div className="relative flex flex-wrap justify-between gap-5 items-start">
-            <div><p className="text-xs uppercase tracking-[.2em] text-emerald-200 font-bold">Pracovní přehled</p><h2 className="text-3xl sm:text-4xl font-bold tracking-tight mt-2">Dobrý den, milá paní knihovnice! <span aria-hidden="true">📚</span></h2><p className="text-emerald-100/80 mt-2 max-w-xl">Vítejte zpátky ve své knihovně. Tady máte dnešní přehled výpůjček, vrácení a knih, které čekají na své místo.</p></div>
+            <div><p className="text-xs uppercase tracking-[.2em] text-emerald-200 font-bold">Pracovní přehled</p><h2 className="text-3xl sm:text-4xl font-bold tracking-tight mt-2">Dobrý den! <span aria-hidden="true">📚</span></h2><p className="text-emerald-100/80 mt-2 max-w-xl">Vítejte zpátky ve své knihovně. Tady je přehled výpůjček, vrácení a knih, které čekají na své místo.</p></div>
             
           </div>
           <div className="relative mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
