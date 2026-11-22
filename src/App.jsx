@@ -67,6 +67,7 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sectionFilter, setSectionFilter] = useState('all');
+  const [overdueOnly, setOverdueOnly] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [isbnOpen, setIsbnOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -154,16 +155,24 @@ export default function App() {
   };
   const startEmptyCloud = () => {setCloudReady(true);setCloudStatus('saving');};
 
+  const today = new Date().toLocaleDateString('sv-SE');
+  const overdueBooks = books.filter(b => b.status === 'borrowed' && b.dueDate && b.dueDate < today);
+  const dueSoonBooks = books.filter(b => b.status === 'borrowed' && b.dueDate && b.dueDate >= today && b.dueDate <= new Date(Date.now()+7*86400000).toLocaleDateString('sv-SE'));
   const filtered = useMemo(() => books.filter(b => {
     const text = [b.title, b.authors, b.isbn, b.section, b.shelf, b.note, b.borrower].join(' ').toLocaleLowerCase('cs');
     return text.includes(query.toLocaleLowerCase('cs')) &&
       (statusFilter === 'all' || b.status === statusFilter) &&
-      (sectionFilter === 'all' || b.section === sectionFilter);
-  }).sort((a,b) => a.title.localeCompare(b.title, 'cs')), [books, query, statusFilter, sectionFilter]);
+      (sectionFilter === 'all' || b.section === sectionFilter) &&
+      (!overdueOnly || (b.status === 'borrowed' && b.dueDate && b.dueDate < today));
+  }).sort((a,b) => a.title.localeCompare(b.title, 'cs')), [books, query, statusFilter, sectionFilter, overdueOnly, today]);
 
   const borrowed = books.filter(b => b.status === 'borrowed').length;
   const shelfCount = shelves.length;
   const unsortedCount = books.filter(b => !b.shelf).length;
+
+  const showOverdue = () => { setActiveView('catalog'); setStatusFilter('borrowed'); setSectionFilter('all'); setOverdueOnly(true); document.getElementById('library-catalog')?.scrollIntoView({behavior:'smooth'}); };
+  const showAvailable = () => {setActiveView('catalog'); setStatusFilter('available'); setOverdueOnly(false); document.getElementById('library-catalog')?.scrollIntoView({behavior:'smooth'});};
+  const returnBook = book => { if (!window.confirm('Potvrdit vrácení knihy „' + book.title + '“?')) return; setBooks(prev => prev.map(b => b.id === book.id ? {...b,status:'available',borrower:'',borrowedAt:'',dueDate:''} : b)); setMessage('Vrácení knihy bylo zaznamenáno.'); };
 
   const upsert = book => {
     const finalBook = normalize(book);
@@ -272,28 +281,42 @@ export default function App() {
         </div>
       </nav>
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-7 space-y-6">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 flex items-start gap-2"><AlertTriangle size={19} className="shrink-0 mt-0.5"/><span><b>Lokální evidence:</b> knihy se zatím ukládají jen v tomto prohlížeči a nesynchronizují se mezi počítači. Pro jistotu pravidelně stahujte JSON zálohu. Pro skutečný sdílený provoz knihovny je nutná online databáze a přihlášení.</span></div>
+        {!cloudUser && <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600"><span className="flex items-center gap-2"><AlertTriangle size={17} className="text-amber-600 shrink-0"/>{cloudEnabled ? 'Pracujete bez přihlášení. Změny se ukládají jen na tomto zařízení.' : 'Online knihovna zatím není aktivována. Změny se ukládají pouze do tohoto zařízení.'}</span><div className="flex gap-2"><button className="font-semibold text-emerald-900 underline" onClick={()=>setAccountOpen(true)}>{cloudEnabled ? 'Přihlásit se' : 'Jak aktivovat účet'}</button><button className="font-semibold text-stone-600 underline" onClick={exportJson}>Stáhnout zálohu</button></div></div>}
         {cloudUser && <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 flex flex-wrap justify-between gap-2 items-center text-sm">
           <span>☁ Online účet: <strong>{cloudUser.email}</strong> · {cloudStatus === 'saved' ? 'Uloženo online' : cloudStatus === 'saving' ? 'Ukládám…' : cloudStatus === 'loading' ? 'Načítám…' : cloudStatus === 'empty' ? 'Prázdný online katalog' : cloudStatus === 'error' ? 'Chyba synchronizace' : 'Připraveno'}</span>
           {!hasCloudData && !cloudReady && cloudStatus === 'empty' && <div className="flex flex-wrap gap-2"><button onClick={importLocalToCloud} className="bg-emerald-800 text-white rounded-lg px-3 py-2">Převzít místní knihy</button><button onClick={startEmptyCloud} className="bg-stone-100 rounded-lg px-3 py-2">Začít s prázdným katalogem</button></div>}
         </div>}
         {message && <div role="status" className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm flex items-center justify-between gap-3"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Zavřít oznámení"><X size={18}/></button></div>}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {[[books.length,'Všechny výtisky',BookOpen], [books.length-borrowed,'Dostupné',CheckCircle2], [borrowed,'Vypůjčené',Clock3], [unsortedCount,'Nezařazené',MapPin]].map(([value,label,Icon]) => <div key={label} className="bg-white border border-stone-200 shadow-sm rounded-3xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4"><div className="p-3 bg-emerald-50 rounded-xl text-emerald-800"><Icon size={25}/></div><div><p className="text-sm text-stone-500">{label}</p><p className="text-3xl font-bold">{value}</p></div></div>)}
-        </div>
+        <section className="relative overflow-hidden rounded-[2rem] bg-[#173b32] p-6 sm:p-9 text-white shadow-xl">
+          <div className="pointer-events-none absolute -right-14 -top-24 h-72 w-72 rounded-full border-[35px] border-white/5"/>
+          <div className="relative flex flex-wrap justify-between gap-5 items-start">
+            <div><p className="text-xs uppercase tracking-[.2em] text-emerald-200 font-bold">Pracovní přehled</p><h2 className="text-3xl sm:text-4xl font-bold tracking-tight mt-2">Dnes v knihovně</h2><p className="text-emerald-100/80 mt-2 max-w-xl">Výpůjčky, vrácení a knihy na správném místě. Vše důležité hned po otevření.</p></div>
+            <div className="flex flex-wrap gap-2"><button onClick={()=>setScanOpen(true)} className="flex items-center gap-2 rounded-xl bg-white text-emerald-950 px-4 py-3 font-bold hover:bg-emerald-50"><ScanLine size={19}/> Načíst ISBN</button><button onClick={()=>setEditing(emptyBook())} className="flex items-center gap-2 rounded-xl border border-white/30 px-4 py-3 font-bold hover:bg-white/10"><Plus size={19}/> Přidat výtisk</button></div>
+          </div>
+          <div className="relative mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[[books.length,'Výtisků v katalogu',BookOpen,'all'],[books.length-borrowed,'Připraveno k půjčení',CheckCircle2,'available'],[borrowed,'Právě vypůjčeno',Clock3,'borrowed'],[overdueBooks.length,'Po termínu vrácení',AlertTriangle,'overdue']].map(([value,label,Icon,filter])=><button key={label} onClick={()=>{if(filter==='overdue')showOverdue();else if(filter==='available')showAvailable();else {setActiveView('catalog');setOverdueOnly(false);setStatusFilter(filter);}}} className="text-left rounded-2xl border border-white/15 bg-white/10 p-4 sm:p-5 hover:bg-white/20 transition focus-visible:outline-2 focus-visible:outline-white"><Icon size={22} className={filter==='overdue'&&value?'text-amber-300':'text-emerald-200'}/><strong className="block mt-3 text-3xl font-bold">{value}</strong><span className="text-xs sm:text-sm text-emerald-50/85">{label}</span></button>)}
+          </div>
+        </section>
+        {(overdueBooks.length > 0 || dueSoonBooks.length > 0 || unsortedCount > 0) && <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-white border border-stone-200 p-4 text-sm">
+          <strong className="text-stone-800">K vyřízení:</strong>
+          {overdueBooks.length > 0 && <button onClick={showOverdue} className="rounded-full bg-rose-50 text-rose-800 px-3 py-2 font-semibold hover:bg-rose-100">{overdueBooks.length} po termínu →</button>}
+          {dueSoonBooks.length > 0 && <span className="rounded-full bg-amber-50 text-amber-900 px-3 py-2">{dueSoonBooks.length} výpůjček končí do 7 dnů</span>}
+          {unsortedCount > 0 && <button onClick={()=>setActiveView('shelves')} className="rounded-full bg-emerald-50 text-emerald-900 px-3 py-2 font-semibold hover:bg-emerald-100">{unsortedCount} knih bez regálu →</button>}
+        </div>}
         {activeView === 'shelves' && <ShelvesView books={books} shelves={shelves} sections={sections}
           onAddShelf={name => setShelves(prev => prev.includes(name) ? prev : [...prev, name])}
           onMoveBook={(id, shelf) => setBooks(prev => prev.map(book => book.id===id ? {...book,shelf} : book))}
           onEditBook={book => setEditing({...book})} />}
         {activeView === 'catalog' && <>
-        <section className="bg-white border border-stone-200 rounded-3xl p-5 sm:p-7 shadow-sm">
-          <div className="mb-4"><span className="text-xs uppercase tracking-[.16em] text-emerald-700 font-bold">Rychlé přidání knihy</span></div>
+        <details className="bg-white border border-stone-200 rounded-3xl p-5 sm:p-7 shadow-sm group">
+          <summary className="cursor-pointer font-semibold text-emerald-900 list-none flex items-center justify-between">Vyhledat titul v online katalogu <span className="text-sm text-stone-500 group-open:hidden">Rozbalit +</span></summary>
+          <div className="mt-5"><div className="mb-4"><span className="text-xs uppercase tracking-[.16em] text-emerald-700 font-bold">Rychlé přidání knihy</span></div>
           <h2 className="font-bold text-lg mb-2">Vyhledat knihu podle názvu v knižním katalogu</h2>
           <p className="text-sm text-stone-500 mb-3">Vyhledáváme v Google Books a Open Library. Záznam před uložením ověřte; Databáze knih není přímo propojena.</p>
           <div className="mb-4 rounded-xl bg-[#f7f6f1] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"><span className="text-sm text-stone-600">Hledáte titul v české Databázi knih?</span><a className="text-sm font-semibold text-emerald-900 underline" href={'https://www.databazeknih.cz/search?q='+encodeURIComponent(lookup)} target="_blank" rel="noopener noreferrer">Otevřít hledání na Databázi knih ↗</a></div>
           <form onSubmit={searchTitles} className="flex flex-col sm:flex-row gap-2"><input className={inputStyle} value={lookup} onChange={e => setLookup(e.target.value)} placeholder="Např. Babička, Harry Potter, Malý princ" aria-label="Název knihy"/><button disabled={loading} className={buttonStyle + ' bg-emerald-800 text-white shrink-0'}><Search size={18}/> {loading ? 'Hledám…' : 'Najít titul'}</button></form>
           {!!lookupResults.length && <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">{lookupResults.map(item => <div key={item.id} className="border border-stone-200 rounded-xl p-3 flex gap-3 items-start">{item.coverUrl ? <img src={item.coverUrl} alt="" className="w-14 h-20 object-cover rounded" /> : <div className="w-14 h-20 bg-stone-100 rounded shrink-0"/>}<div className="min-w-0"><p className="font-semibold text-sm">{item.title}</p><p className="text-xs text-stone-500">{item.authors}</p><button className="text-emerald-800 underline text-sm mt-2" onClick={() => setEditing(normalize({ ...item, id: createId(), section: 'Beletrie' }))}>Přidat výtisk</button></div></div>)}</div>}
-        </section>
+          </div></details>
         {showSettings && <section className="bg-white border border-stone-200 rounded-2xl p-5 space-y-4">
           <h2 className="text-lg font-bold">Regály, sekce a zálohování</h2><p className="text-sm text-stone-500">Sekce pomáhají roztřídit fond; konkrétní umístění zapisujte do pole Regál.</p>
           <div className="flex flex-wrap gap-2">{sections.map(s => <span key={s} className="bg-stone-100 rounded-full px-3 py-1 text-sm">{s}</span>)}</div>
@@ -301,17 +324,18 @@ export default function App() {
           <div className="border-t border-stone-100 pt-4"><h3 className="font-semibold mb-2">Regály</h3><div className="flex flex-wrap gap-2 mb-3">{shelves.map(sh => <span key={sh} className="bg-emerald-50 text-emerald-900 rounded-lg px-3 py-2 text-sm">{sh} <button title={'Odstranit regál ' + sh} onClick={() => { if(books.some(b=>b.shelf===sh)){setMessage('Regál používají uložené knihy. Nejprve je přesuňte.');return;}setShelves(a=>a.filter(v=>v!==sh)); }} aria-label={'Odstranit ' + sh} className="ml-2">×</button></span>)}</div><form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();const sh=newShelf.trim();if(sh&&!shelves.includes(sh))setShelves(a=>[...a,sh]);setNewShelf('');}}><input className={inputStyle+' max-w-xs'} value={newShelf} onChange={e=>setNewShelf(e.target.value)} placeholder="Např. A3 nebo Regál 5"/><button className={buttonStyle+' bg-emerald-800 text-white'}>Vytvořit regál</button></form></div>
           <div className="flex flex-wrap items-center gap-2"><button className={buttonStyle + ' bg-stone-100'} onClick={exportJson}><Download size={17}/> Záloha JSON</button><button className={buttonStyle + ' bg-stone-100'} onClick={exportCsv}><Download size={17}/> Export CSV</button><label className={buttonStyle + ' bg-stone-100 cursor-pointer'}><Upload size={17}/> Importovat JSON<input className="sr-only" type="file" accept=".json,application/json" onChange={importJson}/></label></div>
         </section>}
-        <section className="bg-white border border-stone-200 rounded-3xl shadow-sm overflow-hidden">
+        <section id="library-catalog" className="bg-white border border-stone-200 rounded-3xl shadow-sm overflow-hidden scroll-mt-6">
           <div className="p-5 border-b border-stone-100"><div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 className="text-xl font-bold">Knihovní fond <span className="text-stone-400 text-base font-normal">({filtered.length})</span></h2><button className={buttonStyle + ' bg-emerald-50 text-emerald-900'} onClick={() => setIsbnOpen(true)}><ScanLine size={17}/> Zadat ISBN ručně</button></div>
+          {overdueOnly && <div className="mb-3 flex items-center justify-between rounded-xl bg-rose-50 px-4 py-2 text-sm text-rose-900"><span>Zobrazují se pouze výpůjčky po termínu.</span><button onClick={()=>setOverdueOnly(false)} className="font-bold underline">Zrušit filtr</button></div>}
           <div className="grid sm:grid-cols-[1fr_auto_auto] gap-2"><label className="relative"><Search className="absolute left-3 top-3 text-stone-400" size={19}/><input className={inputStyle + ' pl-10'} placeholder="Hledat název, autora, ISBN, regál…" value={query} onChange={e => setQuery(e.target.value)}/></label>
             <select className={inputStyle} value={sectionFilter} onChange={e => setSectionFilter(e.target.value)} aria-label="Filtrovat sekci"><option value="all">Všechny sekce</option>{sections.map(s=><option key={s}>{s}</option>)}</select>
-            <select className={inputStyle} value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrovat stav"><option value="all">Všechny stavy</option><option value="available">Dostupné</option><option value="borrowed">Vypůjčené</option></select>
+            <select className={inputStyle} value={statusFilter} onChange={e => {setStatusFilter(e.target.value);setOverdueOnly(false);}} aria-label="Filtrovat stav"><option value="all">Všechny stavy</option><option value="available">Dostupné</option><option value="borrowed">Vypůjčené</option></select>
           </div></div>
           {!filtered.length ? <div className="text-center p-16 text-stone-500"><BookOpen size={35} className="mx-auto mb-3 opacity-50"/><p>{books.length ? 'Žádné knihy neodpovídají filtrům.' : 'Katalog je prázdný. Začněte skenováním ISBN nebo přidáním knihy.'}</p></div> :
           <div className="divide-y divide-stone-100">{filtered.map(book => <article key={book.id} className="p-4 sm:p-5 flex flex-wrap sm:flex-nowrap gap-4 items-center hover:bg-stone-50">
             {coverFor(book) ? <img className="w-12 h-16 object-cover rounded border border-stone-200" src={coverFor(book)} onError={e=>{e.currentTarget.style.display='none';}} alt="Obálka knihy"/> : <div className="w-12 h-16 shrink-0 flex items-center justify-center rounded bg-stone-100 text-stone-400"><BookOpen/></div>}
-            <div className="flex-1 min-w-[180px]"><h3 className="font-semibold">{book.title}</h3><p className="text-sm text-stone-500">{book.authors || 'Autor neuveden'}{book.isbn ? ' · ISBN ' + book.isbn : ''}</p><p className="text-sm mt-1 flex items-center gap-1 text-stone-600"><MapPin size={14}/>{book.section} {book.shelf ? ' · Regál ' + book.shelf : ' · Regál neurčen'}{book.borrower ? ' · Čtenář: ' + book.borrower : ''}</p></div>
-            <div className="flex flex-wrap items-center gap-2"><button title="Kliknutím přepnete dostupnost výtisku" onClick={() => setEditing({...book, status:book.status==='borrowed'?'available':'borrowed', borrower:book.status==='borrowed'?'':book.borrower, borrowedAt:book.status==='borrowed'?'':(book.borrowedAt||new Date().toISOString().slice(0,10))})} className={'rounded-full px-3 py-2 text-sm font-bold ' + (book.status==='borrowed'?'bg-amber-100 text-amber-900':'bg-emerald-100 text-emerald-900')}>{book.status === 'borrowed' ? 'Vypůjčeno' : 'Dostupné'} ↔</button><button className="rounded-lg p-2 text-stone-600 hover:bg-stone-200" title="Upravit knihu" onClick={()=>setEditing({...book})}><Pencil size={19}/></button><button className="rounded-lg p-2 text-red-700 hover:bg-red-50" title="Smazat výtisk" onClick={()=>{if(window.confirm('Opravdu odstranit tento výtisk?'))setBooks(a=>a.filter(b=>b.id!==book.id));}}><Trash2 size={19}/></button></div>
+            <div className="flex-1 min-w-[180px]"><h3 className="font-semibold">{book.title}</h3><p className="text-sm text-stone-500">{book.authors || 'Autor neuveden'}{book.isbn ? ' · ISBN ' + book.isbn : ''}</p><p className="text-sm mt-1 flex items-center gap-1 text-stone-600"><MapPin size={14}/>{book.section} {book.shelf ? ' · Regál ' + book.shelf : ' · Regál neurčen'}{book.borrower ? ' · Čtenář: ' + book.borrower : ''}</p>{book.status==='borrowed' && book.dueDate && <p className={'text-xs font-semibold mt-1 ' + (book.dueDate < today ? 'text-rose-700':'text-amber-700')}>{book.dueDate < today ? 'Po termínu: ' : 'Vrátit do: '}{new Date(book.dueDate+'T12:00:00').toLocaleDateString('cs-CZ')}</p>}</div>
+            <div className="flex flex-wrap items-center gap-2">{book.status === 'borrowed' ? <button onClick={()=>returnBook(book)} className="rounded-full bg-amber-100 text-amber-950 px-3 py-2 text-sm font-bold hover:bg-amber-200">Potvrdit vrácení</button> : <button onClick={()=>setEditing({...book,status:'borrowed',borrowedAt:today})} className="rounded-full bg-emerald-100 text-emerald-950 px-3 py-2 text-sm font-bold hover:bg-emerald-200">Půjčit knihu</button>}<button className="rounded-lg p-2 text-stone-600 hover:bg-stone-200" title="Upravit knihu" onClick={()=>setEditing({...book})}><Pencil size={19}/></button><button className="rounded-lg p-2 text-red-700 hover:bg-red-50" title="Smazat výtisk" onClick={()=>{if(window.confirm('Opravdu odstranit tento výtisk?'))setBooks(a=>a.filter(b=>b.id!==book.id));}}><Trash2 size={19}/></button></div>
           </article>)}</div>}
         </section>
         </>}
