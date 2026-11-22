@@ -74,6 +74,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [lookup, setLookup] = useState('');
+  const [lookupAuthor, setLookupAuthor] = useState('');
   const [lookupResults, setLookupResults] = useState([]);
   const [newSection, setNewSection] = useState('');
   const [newShelf, setNewShelf] = useState('');
@@ -208,9 +209,12 @@ export default function App() {
     };
     try {
       const q = lookup.trim();
+      const author = lookupAuthor.trim();
+      const searchTerm = author ? q + ' ' + author : q;
+      const openQuery = author ? 'title=' + encodeURIComponent(q) + '&author=' + encodeURIComponent(author) : 'title=' + encodeURIComponent(q);
       const [google, open] = await Promise.allSettled([
-        fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(q) + '&maxResults=15&langRestrict=cs').then(r => { if (!r.ok) throw Error('Google Books'); return r.json(); }),
-        fetch('https://openlibrary.org/search.json?title=' + encodeURIComponent(q) + '&limit=15&fields=key,title,author_name,first_publish_year,cover_i,isbn,publisher,language&lang=cs').then(r => { if (!r.ok) throw Error('Open Library'); return r.json(); }),
+        fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(searchTerm) + '&maxResults=25&langRestrict=cs').then(r => { if (!r.ok) throw Error('Google Books'); return r.json(); }),
+        fetch('https://openlibrary.org/search.json?' + openQuery + '&limit=15&fields=key,title,author_name,first_publish_year,cover_i,isbn,publisher,language&lang=cs').then(r => { if (!r.ok) throw Error('Open Library'); return r.json(); }),
       ]);
       if (google.status === 'fulfilled') (google.value.items || []).forEach(item => {
         const info = item.volumeInfo || {};
@@ -229,8 +233,15 @@ export default function App() {
           publisher: (item.publisher || [])[0] || '', publishedDate: item.first_publish_year || '',
           source: 'Open Library' });
       });
-      setLookupResults(found);
-      if (!found.length) setMessage('Titul se nepodařilo najít. Zkuste kratší název nebo ruční zadání.');
+      const normText = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('cs');
+      const titleSearch = normText(q);
+      const authorSearch = normText(author);
+      const ranked = found.filter(item => !authorSearch || normText(item.authors).includes(authorSearch) || normText(item.authors).split(' ').some(part => authorSearch.includes(part) && part.length > 3)).sort((a,b) => {
+        const score = item => (normText(item.title) === titleSearch ? 100 : normText(item.title).startsWith(titleSearch) ? 70 : normText(item.title).includes(titleSearch) ? 40 : 0) + (authorSearch && normText(item.authors).includes(authorSearch) ? 40 : 0) + (item.coverUrl ? 5 : 0) + (item.isbn ? 3 : 0);
+        return score(b)-score(a);
+      });
+      setLookupResults(ranked);
+      if (!ranked.length) setMessage('Žádný odpovídající titul. Zkuste kratší název nebo vynechte autora; případně knihu přidejte ručně.');
     } catch { setMessage('Vyhledávání se nezdařilo. Zkuste znovu nebo knihu přidejte ručně.'); }
     finally { setLoading(false); }
   };
@@ -308,15 +319,21 @@ export default function App() {
           onMoveBook={(id, shelf) => setBooks(prev => prev.map(book => book.id===id ? {...book,shelf} : book))}
           onEditBook={book => setEditing({...book})} />}
         {activeView === 'catalog' && <>
-        <details className="bg-white border border-stone-200 rounded-3xl p-5 sm:p-7 shadow-sm group">
-          <summary className="cursor-pointer font-semibold text-emerald-900 list-none flex items-center justify-between">Vyhledat titul v online katalogu <span className="text-sm text-stone-500 group-open:hidden">Rozbalit +</span></summary>
-          <div className="mt-5"><div className="mb-4"><span className="text-xs uppercase tracking-[.16em] text-emerald-700 font-bold">Rychlé přidání knihy</span></div>
-          <h2 className="font-bold text-lg mb-2">Vyhledat knihu podle názvu v knižním katalogu</h2>
-          <p className="text-sm text-stone-500 mb-3">Vyhledáváme v Google Books a Open Library. Záznam před uložením ověřte; Databáze knih není přímo propojena.</p>
-          <div className="mb-4 rounded-xl bg-[#f7f6f1] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"><span className="text-sm text-stone-600">Hledáte titul v české Databázi knih?</span><a className="text-sm font-semibold text-emerald-900 underline" href={'https://www.databazeknih.cz/search?q='+encodeURIComponent(lookup)} target="_blank" rel="noopener noreferrer">Otevřít hledání na Databázi knih ↗</a></div>
-          <form onSubmit={searchTitles} className="flex flex-col sm:flex-row gap-2"><input className={inputStyle} value={lookup} onChange={e => setLookup(e.target.value)} placeholder="Např. Babička, Harry Potter, Malý princ" aria-label="Název knihy"/><button disabled={loading} className={buttonStyle + ' bg-emerald-800 text-white shrink-0'}><Search size={18}/> {loading ? 'Hledám…' : 'Najít titul'}</button></form>
-          {!!lookupResults.length && <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">{lookupResults.map(item => <div key={item.id} className="border border-stone-200 rounded-xl p-3 flex gap-3 items-start">{item.coverUrl ? <img src={item.coverUrl} alt="" className="w-14 h-20 object-cover rounded" /> : <div className="w-14 h-20 bg-stone-100 rounded shrink-0"/>}<div className="min-w-0"><p className="font-semibold text-sm">{item.title}</p><p className="text-xs text-stone-500">{item.authors}</p><button className="text-emerald-800 underline text-sm mt-2" onClick={() => setEditing(normalize({ ...item, id: createId(), section: 'Beletrie' }))}>Přidat výtisk</button></div></div>)}</div>}
-          </div></details>
+        <section className="rounded-[1.75rem] border border-emerald-200 bg-white p-5 sm:p-7 shadow-sm" aria-labelledby="title-search-heading">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><p className="text-xs uppercase tracking-[.16em] text-emerald-700 font-bold">Nejrychlejší způsob přidání</p><h2 id="title-search-heading" className="text-xl sm:text-2xl font-bold mt-1">Přidat knihu podle názvu</h2><p className="text-sm text-stone-600 mt-2">Napište název a případně autora. Vyberte vydání, zkontrolujte údaje a uložte výtisk do regálu.</p></div>
+            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900 font-semibold">Není potřeba ISBN</div>
+          </div>
+          <form onSubmit={searchTitles} className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] items-end">
+            <label className="block"><span className="block text-xs font-semibold text-stone-700 mb-1">Název knihy *</span><input className={inputStyle} required value={lookup} onChange={e => setLookup(e.target.value)} placeholder="Např. Babička" autoComplete="off"/></label>
+            <label className="block"><span className="block text-xs font-semibold text-stone-700 mb-1">Autor (volitelné)</span><input className={inputStyle} value={lookupAuthor} onChange={e => setLookupAuthor(e.target.value)} placeholder="Božena Němcová" autoComplete="off"/></label>
+            <button disabled={loading || !lookup.trim()} type="submit" className={buttonStyle + ' bg-emerald-800 text-white shrink-0 disabled:opacity-50'}><Search size={18}/> {loading ? 'Hledám…' : 'Vyhledat knihu'}</button>
+          </form>
+          <p className="mt-3 text-xs text-stone-500">Výsledky se načítají z Google Books a Open Library. Databáze knih je k dispozici pro ruční ověření, nikoli pro automatický import.</p>
+          <a className="inline-flex text-sm font-semibold text-emerald-900 underline mt-2" href={'https://www.databazeknih.cz/search?q='+encodeURIComponent([lookup,lookupAuthor].filter(Boolean).join(' '))} target="_blank" rel="noopener noreferrer">Porovnat hledání v Databázi knih ↗</a>
+          {!!lookupResults.length && <div className="mt-6"><h3 className="text-sm font-bold text-stone-700 mb-3">Nalezené knihy ({lookupResults.length}) – vyberte odpovídající vydání</h3><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{lookupResults.map(item => <article key={item.id} className="border border-stone-200 rounded-2xl p-3 flex gap-3 items-start hover:border-emerald-400 hover:shadow-sm transition">{item.coverUrl ? <img src={item.coverUrl} loading="lazy" alt={'Obálka knihy '+item.title} className="w-16 h-24 object-cover rounded-md shrink-0 bg-stone-100" onError={e=>{e.currentTarget.style.visibility='hidden';}}/> : <div className="w-16 h-24 bg-stone-100 rounded-md shrink-0 flex items-center justify-center text-stone-400"><BookOpen size={22}/></div>}<div className="min-w-0 flex-1"><h4 className="font-bold text-sm leading-snug">{item.title}</h4><p className="text-xs text-stone-600 mt-1">{item.authors || 'Autor neuveden'}</p><p className="text-xs text-stone-500 mt-1">{[item.publishedDate, item.publisher, item.isbn ? 'ISBN '+item.isbn : ''].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-stone-400 mt-1">{item.source}</p><button type="button" className="rounded-lg bg-emerald-800 text-white font-bold text-xs px-3 py-2 mt-3 hover:bg-emerald-900" onClick={() => setEditing(normalize({ ...item, id: createId(), section: 'Beletrie', status:'available', shelf:'' }))}>+ Přidat tento výtisk</button></div></article>)}</div></div>}
+          <div className="mt-5 border-t border-stone-100 pt-4 flex flex-wrap gap-2 items-center"><span className="text-xs text-stone-500">Kniha není v katalogu?</span><button type="button" className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold hover:bg-stone-50" onClick={()=>setEditing({...emptyBook(), title: lookup.trim(), authors:lookupAuthor.trim()})}>Přidat knihu ručně</button><button type="button" className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold hover:bg-stone-50" onClick={()=>setIsbnOpen(true)}>Vyhledat podle ISBN</button></div>
+        </section>
         {showSettings && <section className="bg-white border border-stone-200 rounded-2xl p-5 space-y-4">
           <h2 className="text-lg font-bold">Regály, sekce a zálohování</h2><p className="text-sm text-stone-500">Sekce pomáhají roztřídit fond; konkrétní umístění zapisujte do pole Regál.</p>
           <div className="flex flex-wrap gap-2">{sections.map(s => <span key={s} className="bg-stone-100 rounded-full px-3 py-1 text-sm">{s}</span>)}</div>
