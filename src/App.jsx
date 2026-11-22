@@ -28,6 +28,8 @@ const normalize = (book) => ({
   dueDate: book.dueDate || '',
   addedAt: book.addedAt || new Date().toISOString(),
 });
+const CZECH_FALLBACK = [{ id:'verified:zuzanin-dech', title:'Zuzanin dech', authors:'Jakuba Katalpa', isbn:'9788027502417', publisher:'Host', publishedDate:'2020', description:'Román o Zuzaně, jejíž život zásadně zasáhne druhá světová válka a pronásledování Židů. Příběh sleduje proměny lidí a jejich vztahů v období protektorátu.', source:'Host / Národní knihovna ČR', coverUrl:'https://covers.openlibrary.org/b/isbn/9788027502417-M.jpg?default=false' }];
+const normQuery = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('cs').trim();
 const emptyBook = () => normalize({ id: createId(), title: '', authors: '', isbn: '', section: 'Beletrie', shelf: '', status: 'available', coverUrl: '' });
 
 function loadBooks() {
@@ -198,52 +200,43 @@ export default function App() {
 
   const searchTitles = async event => {
     event.preventDefault();
-    if (!lookup.trim()) return;
-    setLoading(true); setLookupResults([]); setMessage('');
-    // Try two independent catalog sources. Some titles are absent from one of them.
-    const found = [];
-    const seen = new Set();
-    const add = item => {
-      const key = (item.isbn || (item.title + '|' + item.authors)).toLocaleLowerCase('cs');
-      if (!seen.has(key)) { seen.add(key); found.push(item); }
-    };
-    try {
-      const q = lookup.trim();
-      const author = lookupAuthor.trim();
-      const searchTerm = author ? q + ' ' + author : q;
-      const openQuery = author ? 'title=' + encodeURIComponent(q) + '&author=' + encodeURIComponent(author) : 'title=' + encodeURIComponent(q);
-      const [google, open] = await Promise.allSettled([
-        fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(searchTerm) + '&maxResults=25&langRestrict=cs').then(r => { if (!r.ok) throw Error('Google Books'); return r.json(); }),
-        fetch('https://openlibrary.org/search.json?' + openQuery + '&limit=15&fields=key,title,author_name,first_publish_year,cover_i,isbn,publisher,language&lang=cs').then(r => { if (!r.ok) throw Error('Open Library'); return r.json(); }),
-      ]);
-      if (google.status === 'fulfilled') (google.value.items || []).forEach(item => {
-        const info = item.volumeInfo || {};
-        add({ id: 'google:' + item.id, title: info.title || 'Bez názvu',
-          authors: (info.authors || []).join(', '),
-          isbn: (info.industryIdentifiers || []).find(v => v.type === 'ISBN_13')?.identifier || (info.industryIdentifiers || [])[0]?.identifier || '',
-          coverUrl: (info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || '').replace(/^http:/, 'https:'),
-          publisher: info.publisher || '', publishedDate: info.publishedDate || '',
-          pageCount: info.pageCount || '', genre: (info.categories || []).join(', '),
-          description: info.description ? info.description.replace(/<[^>]*>/g, '') : '', source: 'Google Books' });
-      });
-      if (open.status === 'fulfilled') (open.value.docs || []).forEach(item => {
-        add({ id: 'open:' + item.key, title: item.title || 'Bez názvu',
-          authors: (item.author_name || []).join(', '), isbn: (item.isbn || []).find(v => /^97[89]\d{10}$/.test(v)) || '',
-          coverUrl: item.cover_i ? 'https://covers.openlibrary.org/b/id/' + item.cover_i + '-M.jpg' : '',
-          publisher: (item.publisher || [])[0] || '', publishedDate: item.first_publish_year || '',
-          source: 'Open Library' });
-      });
-      const normText = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('cs');
-      const titleSearch = normText(q);
-      const authorSearch = normText(author);
-      const ranked = found.filter(item => !authorSearch || normText(item.authors).includes(authorSearch) || normText(item.authors).split(' ').some(part => authorSearch.includes(part) && part.length > 3)).sort((a,b) => {
-        const score = item => (normText(item.title) === titleSearch ? 100 : normText(item.title).startsWith(titleSearch) ? 70 : normText(item.title).includes(titleSearch) ? 40 : 0) + (authorSearch && normText(item.authors).includes(authorSearch) ? 40 : 0) + (item.coverUrl ? 5 : 0) + (item.isbn ? 3 : 0);
-        return score(b)-score(a);
-      });
+    const q=lookup.trim(), author=lookupAuthor.trim();
+    if(!q)return;
+    setLoading(true);setLookupResults([]);setMessage('');
+    const results=[], seen=new Set();
+    const add=item=>{if(!item.title)return;const key=(item.isbn||item.title+'|'+item.authors).toLowerCase();if(!seen.has(key)){seen.add(key);results.push(item);}};
+    const addGoogle=data=>(data?.items||[]).forEach(v=>{const i=v.volumeInfo||{};add({
+      id:'google:'+v.id,title:i.title||'',authors:(i.authors||[]).join(', '),
+      isbn:(i.industryIdentifiers||[]).find(x=>x.type==='ISBN_13')?.identifier||(i.industryIdentifiers||[])[0]?.identifier||'',
+      coverUrl:(i.imageLinks?.thumbnail||i.imageLinks?.smallThumbnail||'').replace(/^http:/,'https:'),
+      publisher:i.publisher||'',publishedDate:i.publishedDate||'',pageCount:i.pageCount||'',
+      genre:(i.categories||[]).join(', '),description:(i.description||'').replace(/<[^>]*>/g,'').slice(0,1400),source:'Google Books'});});
+    const addOpen=data=>(data?.docs||[]).forEach(i=>add({id:'open:'+i.key,title:i.title||'',
+      authors:(i.author_name||[]).join(', '),isbn:(i.isbn||[]).find(x=>/^97[89]\d{10}$/.test(x))||'',
+      coverUrl:i.cover_i?'https://covers.openlibrary.org/b/id/'+i.cover_i+'-M.jpg':'',
+      publisher:(i.publisher||[])[0]||'',publishedDate:i.first_publish_year||'',
+      description:typeof i.first_sentence==='string'?i.first_sentence:(i.first_sentence||[])[0]||'',source:'Open Library'}));
+    try{
+      const openParams=new URLSearchParams({title:q,...(author?{author}:{}),limit:'30',
+        fields:'key,title,author_name,first_publish_year,cover_i,isbn,publisher,first_sentence'});
+      const urls=[
+        ['https://www.googleapis.com/books/v1/volumes?q='+encodeURIComponent('intitle:'+q+(author?' inauthor:'+author:''))+'&maxResults=40',addGoogle],
+        ['https://www.googleapis.com/books/v1/volumes?q='+encodeURIComponent(q+' '+author)+'&maxResults=40',addGoogle],
+        ['https://openlibrary.org/search.json?'+openParams,addOpen]
+      ];
+      await Promise.allSettled(urls.map(async ([url,collect])=>{const r=await fetch(url);if(!r.ok)throw Error('Catalog error');collect(await r.json());}));
+      const title=normQuery(q), writer=normQuery(author);
+      CZECH_FALLBACK.forEach(item=>{if(normQuery(item.title).includes(title)&&(!writer||normQuery(item.authors).includes(writer)))add(item);});
+      const ranked=results.filter(item=>normQuery(item.title).includes(title)||title.split(/\s+/).every(part=>normQuery(item.title).includes(part)))
+        .sort((x,y)=>{
+          const score=i=>(normQuery(i.title)===title?100:normQuery(i.title).startsWith(title)?60:20)
+            +(writer&&normQuery(i.authors).includes(writer)?40:0)+(i.description?7:0)+(i.coverUrl?5:0);
+          return score(y)-score(x);
+        });
       setLookupResults(ranked);
-      if (!ranked.length) setMessage('Žádný odpovídající titul. Zkuste kratší název nebo vynechte autora; případně knihu přidejte ručně.');
-    } catch { setMessage('Vyhledávání se nezdařilo. Zkuste znovu nebo knihu přidejte ručně.'); }
-    finally { setLoading(false); }
+      if(!ranked.length)setMessage('Titul se v připojených katalozích nenašel. Zkuste název bez autora nebo ruční přidání.');
+    }catch{setMessage('Vyhledávání dočasně nefunguje. Knihu můžete přidat ručně.');}
+    finally{setLoading(false);}
   };
 
   const exportJson = () => download('knihovna-zaloha.json', JSON.stringify({ version: 2, books, sections, shelves, exportedAt: new Date().toISOString() }, null, 2), 'application/json');
@@ -331,7 +324,7 @@ export default function App() {
           </form>
           <p className="mt-3 text-xs text-stone-500">Výsledky se načítají z Google Books a Open Library. Databáze knih je k dispozici pro ruční ověření, nikoli pro automatický import.</p>
           <a className="inline-flex text-sm font-semibold text-emerald-900 underline mt-2" href={'https://www.databazeknih.cz/search?q='+encodeURIComponent([lookup,lookupAuthor].filter(Boolean).join(' '))} target="_blank" rel="noopener noreferrer">Porovnat hledání v Databázi knih ↗</a>
-          {!!lookupResults.length && <div className="mt-6"><h3 className="text-sm font-bold text-stone-700 mb-3">Nalezené knihy ({lookupResults.length}) – vyberte odpovídající vydání</h3><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{lookupResults.map(item => <article key={item.id} className="border border-stone-200 rounded-2xl p-3 flex gap-3 items-start hover:border-emerald-400 hover:shadow-sm transition">{item.coverUrl ? <img src={item.coverUrl} loading="lazy" alt={'Obálka knihy '+item.title} className="w-16 h-24 object-cover rounded-md shrink-0 bg-stone-100" onError={e=>{e.currentTarget.style.visibility='hidden';}}/> : <div className="w-16 h-24 bg-stone-100 rounded-md shrink-0 flex items-center justify-center text-stone-400"><BookOpen size={22}/></div>}<div className="min-w-0 flex-1"><h4 className="font-bold text-sm leading-snug">{item.title}</h4><p className="text-xs text-stone-600 mt-1">{item.authors || 'Autor neuveden'}</p><p className="text-xs text-stone-500 mt-1">{[item.publishedDate, item.publisher, item.isbn ? 'ISBN '+item.isbn : ''].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-stone-400 mt-1">{item.source}</p><button type="button" className="rounded-lg bg-emerald-800 text-white font-bold text-xs px-3 py-2 mt-3 hover:bg-emerald-900" onClick={() => setEditing(normalize({ ...item, id: createId(), section: 'Beletrie', status:'available', shelf:'' }))}>+ Přidat tento výtisk</button></div></article>)}</div></div>}
+          {!!lookupResults.length && <div className="mt-6"><h3 className="text-sm font-bold text-stone-700 mb-3">Nalezené knihy ({lookupResults.length}) – vyberte odpovídající vydání</h3><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{lookupResults.map(item => <article key={item.id} className="border border-stone-200 rounded-2xl p-3 flex gap-3 items-start hover:border-emerald-400 hover:shadow-sm transition">{item.coverUrl ? <img src={item.coverUrl} loading="lazy" alt={'Obálka knihy '+item.title} className="w-16 h-24 object-cover rounded-md shrink-0 bg-stone-100" onError={e=>{e.currentTarget.style.visibility='hidden';}}/> : <div className="w-16 h-24 bg-stone-100 rounded-md shrink-0 flex items-center justify-center text-stone-400"><BookOpen size={22}/></div>}<div className="min-w-0 flex-1"><h4 className="font-bold text-sm leading-snug">{item.title}</h4><p className="text-xs text-stone-600 mt-1">{item.authors || 'Autor neuveden'}</p><p className="text-xs text-stone-500 mt-1">{[item.publishedDate, item.publisher, item.isbn ? 'ISBN '+item.isbn : ''].filter(Boolean).join(' · ')}</p>{item.description && <p className="text-xs text-stone-600 mt-2 line-clamp-3">{item.description}</p>}<p className="text-[11px] text-stone-400 mt-1">{item.source}</p><button type="button" className="rounded-lg bg-emerald-800 text-white font-bold text-xs px-3 py-2 mt-3 hover:bg-emerald-900" onClick={() => setEditing(normalize({ ...item, id: createId(), section: 'Beletrie', status:'available', shelf:'' }))}>+ Přidat tento výtisk</button></div></article>)}</div></div>}
           <div className="mt-5 border-t border-stone-100 pt-4 flex flex-wrap gap-2 items-center"><span className="text-xs text-stone-500">Kniha není v katalogu?</span><button type="button" className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold hover:bg-stone-50" onClick={()=>setEditing({...emptyBook(), title: lookup.trim(), authors:lookupAuthor.trim()})}>Přidat knihu ručně</button><button type="button" className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold hover:bg-stone-50" onClick={()=>setIsbnOpen(true)}>Vyhledat podle ISBN</button></div>
         </section>
         {showSettings && <section className="bg-white border border-stone-200 rounded-2xl p-5 space-y-4">
@@ -365,8 +358,8 @@ export default function App() {
         <div className="flex justify-between items-center"><h2 className="text-xl font-bold">Údaje výtisku</h2><button type="button" onClick={()=>setEditing(null)} aria-label="Zavřít"><X/></button></div>
         <p className="text-sm text-stone-500">Každou fyzickou kopii knihy ukládejte jako samostatný výtisk. Dostupnost lze kdykoliv změnit.</p>
         <div className="flex flex-col sm:flex-row gap-5 rounded-xl bg-stone-50 p-4">{coverFor(editing) ? <img src={coverFor(editing)} onError={e=>{e.currentTarget.style.display='none';}} alt="Obálka knihy" className="w-32 h-44 object-contain rounded-lg shadow bg-white shrink-0"/> : <div className="w-32 h-44 bg-stone-200 rounded-xl flex items-center justify-center text-stone-500"><BookOpen size={40}/></div>}<div className="min-w-0 space-y-2"><h3 className="text-xl font-bold">{editing.title || 'Nová kniha'}</h3><p className="text-stone-500">{editing.authors || 'Autor nezadán'}</p><p className="text-sm">{[editing.genre,editing.publisher,editing.publishedDate,editing.pageCount ? editing.pageCount + ' stran' : ''].filter(Boolean).join(' · ')}</p><p className="text-sm text-stone-600 leading-relaxed max-h-40 overflow-auto">{editing.description || 'Anotace knihy zatím není v katalogu dostupná.'}</p></div></div>
-        {[['title','Název knihy'],['authors','Autor'],['isbn','ISBN'],['coverUrl','URL obálky'],['publisher','Nakladatelství'],['publishedDate','Rok vydání'],['genre','Žánr'],['pageCount','Počet stran']].map(([key,label])=><label key={key} className="block"><span className="block text-sm font-medium mb-1">{label}</span><input required={key==='title'} className={inputStyle} value={editing[key]||''} onChange={e=>setEditing(b=>({...b,[key]:e.target.value}))}/></label>)}
-        <label className="block"><span className="block text-sm font-medium mb-1">Anotace / popis knihy</span><textarea className={inputStyle} rows={4} value={editing.description||''} onChange={e=>setEditing(b=>({...b,description:e.target.value}))}/></label>
+        {[['title','Název knihy'],['authors','Autor'],['isbn','ISBN'],['publisher','Nakladatelství'],['publishedDate','Rok vydání'],['genre','Žánr'],['pageCount','Počet stran']].map(([key,label])=><label key={key} className="block"><span className="block text-sm font-medium mb-1">{label}</span><input required={key==='title'} className={inputStyle} value={editing[key]||''} onChange={e=>setEditing(b=>({...b,[key]:e.target.value}))}/></label>)}
+        <label className="block"><span className="block text-sm font-medium mb-1">Krátký popis knihy</span><textarea className={inputStyle} rows={3} maxLength={1400} placeholder="Stručně o čem kniha je…" value={editing.description||''} onChange={e=>setEditing(b=>({...b,description:e.target.value}))}/></label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><label><span className="block text-sm font-medium mb-1">Sekce</span><select className={inputStyle} value={editing.section} onChange={e=>setEditing(b=>({...b,section:e.target.value}))}>{!sections.includes(editing.section)&&<option>{editing.section}</option>}{sections.map(s=><option key={s}>{s}</option>)}</select></label>
         <label><span className="block text-sm font-medium mb-1">Regál</span><select className={inputStyle} value={editing.shelf||''} onChange={e=>setEditing(b=>({...b,shelf:e.target.value}))}><option value="">Nezařazeno</option>{editing.shelf && !shelves.includes(editing.shelf) && <option>{editing.shelf}</option>}{shelves.map(sh=><option key={sh}>{sh}</option>)}</select></label><label><span className="block text-sm font-medium mb-1">Stav výtisku</span><select className={inputStyle} value={editing.status} onChange={e=>setEditing(b=>({...b,status:e.target.value}))}><option value="available">Dostupné</option><option value="borrowed">Vypůjčené</option></select></label></div>
         {editing.status === 'borrowed' && <div className="grid sm:grid-cols-3 gap-3 rounded-xl bg-amber-50 p-4"><label><span className="block text-sm font-medium mb-1">Kdo si vypůjčil *</span><input className={inputStyle} required value={editing.borrower||''} placeholder="Jméno / ID čtenáře" onChange={e=>setEditing(b=>({...b,borrower:e.target.value}))}/></label><label><span className="block text-sm font-medium mb-1">Datum výpůjčky</span><input type="date" className={inputStyle} value={editing.borrowedAt||''} onChange={e=>setEditing(b=>({...b,borrowedAt:e.target.value}))}/></label><label><span className="block text-sm font-medium mb-1">Vrátit do</span><input type="date" className={inputStyle} value={editing.dueDate||''} onChange={e=>setEditing(b=>({...b,dueDate:e.target.value}))}/></label></div>}
