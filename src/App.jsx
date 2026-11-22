@@ -211,6 +211,20 @@ export default function App() {
       coverUrl:(i.imageLinks?.thumbnail||i.imageLinks?.smallThumbnail||'').replace(/^http:/,'https:'),
       publisher:i.publisher||'',publishedDate:i.publishedDate||'',pageCount:i.pageCount||'',
       genre:(i.categories||[]).join(', '),description:(i.description||'').replace(/<[^>]*>/g,'').slice(0,1400),source:'Google Books'});});
+    // Czech national library portal: include title/author/ISBN and a cover only if its API returns a direct image URL.
+    const addKnihovny=data=>(data?.records||[]).forEach(i=>{
+      const isbn=(Array.isArray(i.isbns)?i.isbns:[]).map(v=>String(v).replace(/[^0-9X]/gi,'')).find(v=>/^97[89]\d{10}$/.test(v))||'';
+      const title=typeof i.title==='string'?i.title.trim():'';
+      const names=i.authors?.primary?Object.keys(i.authors.primary):[];
+      const authors=names.map(v=>v.replace(/,?\s*\d{4}\s*-\s*\d{0,4}/g,'').trim()).join(', ');
+      const imageCandidates=[i.coverUrl,i.cover,i.thumbnail,i.imageUrl];
+      const coverUrl=imageCandidates.find(v=>typeof v==='string'&&/^https:\/\//i.test(v))||'';
+      const description=(Array.isArray(i.summary)?i.summary.join(' '):typeof i.summary==='string'?i.summary:'').slice(0,1400);
+      add({id:'knihovny:'+String(i.id||isbn||title),title,authors,isbn,coverUrl,
+        publisher:Array.isArray(i.publishers)?i.publishers[0]||'':'',
+        publishedDate:Array.isArray(i.publicationDates)?String(i.publicationDates[0]||''):'',
+        description,source:'Knihovny.cz'});
+    });
     const addOpen=data=>(data?.docs||[]).forEach(i=>add({id:'open:'+i.key,title:i.title||'',
       authors:(i.author_name||[]).join(', '),isbn:(i.isbn||[]).find(x=>/^97[89]\d{10}$/.test(x))||'',
       coverUrl:i.cover_i?'https://covers.openlibrary.org/b/id/'+i.cover_i+'-M.jpg':'',
@@ -219,7 +233,10 @@ export default function App() {
     try{
       const openParams=new URLSearchParams({title:q,...(author?{author}:{}),limit:'30',
         fields:'key,title,author_name,first_publish_year,cover_i,isbn,publisher,first_sentence'});
+      const czParams=new URLSearchParams({lookfor:q+(author?' '+author:''),type:'AllFields',limit:'20'});
+      ['id','title','authors','isbns','publishers','publicationDates','summary','coverUrl'].forEach(field=>czParams.append('field[]',field));
       const urls=[
+        ['https://www.knihovny.cz/api/v1/search?'+czParams.toString(),addKnihovny],
         ['https://www.googleapis.com/books/v1/volumes?q='+encodeURIComponent('intitle:'+q+(author?' inauthor:'+author:''))+'&maxResults=40',addGoogle],
         ['https://www.googleapis.com/books/v1/volumes?q='+encodeURIComponent(q+' '+author)+'&maxResults=40',addGoogle],
         ['https://openlibrary.org/search.json?'+openParams,addOpen]
@@ -322,8 +339,8 @@ export default function App() {
             <label className="block"><span className="block text-xs font-semibold text-stone-700 mb-1">Autor (volitelné)</span><input className={inputStyle} value={lookupAuthor} onChange={e => setLookupAuthor(e.target.value)} placeholder="Božena Němcová" autoComplete="off"/></label>
             <button disabled={loading || !lookup.trim()} type="submit" className={buttonStyle + ' bg-emerald-800 text-white shrink-0 disabled:opacity-50'}><Search size={18}/> {loading ? 'Hledám…' : 'Vyhledat knihu'}</button>
           </form>
-          <p className="mt-3 text-xs text-stone-500">Výsledky se načítají z Google Books a Open Library. Databáze knih je k dispozici pro ruční ověření, nikoli pro automatický import.</p>
-          <a className="inline-flex text-sm font-semibold text-emerald-900 underline mt-2" href={'https://www.databazeknih.cz/search?q='+encodeURIComponent([lookup,lookupAuthor].filter(Boolean).join(' '))} target="_blank" rel="noopener noreferrer">Porovnat hledání v Databázi knih ↗</a>
+          <p className="mt-3 text-xs text-stone-500">Vyhledáváme v Knihovny.cz, Google Books a Open Library. České obálky ze služby ObálkyKnih.cz vyžadují registraci knihovny; do její aktivace je nelze automaticky přebírat.</p>
+          <a className="inline-flex text-sm font-semibold text-emerald-900 underline mt-2" href={'https://www.databazeknih.cz/search?q='+encodeURIComponent([lookup,lookupAuthor].filter(Boolean).join(' '))} target="_blank" rel="noopener noreferrer">Porovnat hledání v Databázi knih ↗</a><a className="inline-flex ml-4 text-sm font-semibold text-emerald-900 underline mt-2" href={'https://www.knihovny.cz/Search/Results?lookfor='+encodeURIComponent([lookup,lookupAuthor].filter(Boolean).join(' '))+'&type=AllFields'} target="_blank" rel="noopener noreferrer">Ověřit v Knihovny.cz ↗</a><a className="inline-flex ml-4 text-sm font-semibold text-emerald-900 underline mt-2" href="https://obalkyknih.cz/for_libraries" target="_blank" rel="noopener noreferrer">ObálkyKnih.cz – zapojení knihovny ↗</a>
           {!!lookupResults.length && <div className="mt-6"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-bold text-stone-700">Nalezené knihy ({lookupResults.length}) – vyberte odpovídající vydání</h3><button type="button" onClick={()=>setLookupResults([])} aria-label="Zavřít výsledky vyhledávání" className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-emerald-700"><X size={17}/> Zavřít výsledky</button></div><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{lookupResults.map(item => <article key={item.id} className="border border-stone-200 rounded-2xl p-3 flex gap-3 items-start hover:border-emerald-400 hover:shadow-sm transition">{item.coverUrl ? <img src={item.coverUrl} loading="lazy" alt={'Obálka knihy '+item.title} className="w-16 h-24 object-cover rounded-md shrink-0 bg-stone-100" onError={e=>{e.currentTarget.style.visibility='hidden';}}/> : <div className="w-16 h-24 bg-stone-100 rounded-md shrink-0 flex items-center justify-center text-stone-400"><BookOpen size={22}/></div>}<div className="min-w-0 flex-1"><h4 className="font-bold text-sm leading-snug">{item.title}</h4><p className="text-xs text-stone-600 mt-1">{item.authors || 'Autor neuveden'}</p><p className="text-xs text-stone-500 mt-1">{[item.publishedDate, item.publisher, item.isbn ? 'ISBN '+item.isbn : ''].filter(Boolean).join(' · ')}</p>{item.description && <p className="text-xs text-stone-600 mt-2 line-clamp-3">{item.description}</p>}<p className="text-[11px] text-stone-400 mt-1">{item.source}</p><button type="button" className="rounded-lg bg-emerald-800 text-white font-bold text-xs px-3 py-2 mt-3 hover:bg-emerald-900" onClick={() => setEditing(normalize({ ...item, id: createId(), section: 'Beletrie', status:'available', shelf:'' }))}>+ Přidat tento výtisk</button></div></article>)}</div></div>}
 
         </section>
