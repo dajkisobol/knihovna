@@ -23,17 +23,16 @@ const enqueue = task => {
   return next;
 };
 const errorText = error => {
-  const reason = String(error?.name || error || '');
+  const reason = [error?.name, error?.message, String(error || '')].filter(Boolean).join(': ');
   if (/NotAllowed|Permission|denied/i.test(reason)) return 'Povolte přístup ke kameře v nastavení prohlížeče a zkuste to znovu.';
   if (/NotFound|DevicesNotFound/i.test(reason)) return 'Nebyla nalezena kamera. Zkuste načíst fotografii.';
   if (/NotReadable|TrackStart/i.test(reason)) return 'Kameru možná používá jiná aplikace. Zavřete ji a zkuste znovu.';
-  return 'Kameru se nepodařilo spustit. Zkuste jinou kameru, fotografii nebo ruční zadání.';
+  return 'Kameru se nepodařilo spustit. Detail: ' + reason;
 };
 
 export function BarcodeScannerModal({ isOpen, onClose, onDetected, onManual }) {
   const reader = useRef(null);
   const detected = useRef(onDetected);
-  const session = useRef(null);
   const [attempt, setAttempt] = useState(0);
   const [facing, setFacing] = useState('environment');
   const [status, setStatus] = useState('starting');
@@ -43,7 +42,6 @@ export function BarcodeScannerModal({ isOpen, onClose, onDetected, onManual }) {
   useEffect(()=>{
     if (!isOpen) return;
     const current = { cancelled:false, done:false, scanner:null, running:false };
-    session.current=current;
     setStatus('starting'); setError('');
     const node=reader.current;
     const host=document.createElement('div');
@@ -75,10 +73,14 @@ export function BarcodeScannerModal({ isOpen, onClose, onDetected, onManual }) {
         if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('Camera unavailable');
         const config={fps:12, disableFlip:false};
         try {
-          await current.scanner.start({facingMode:{ideal:facing}},config,accept,()=>{});
+          await current.scanner.start({facingMode:facing},config,accept,()=>{});
         } catch (err) {
           if(current.cancelled || /NotAllowed|Permission|denied|NotReadable/i.test(String(err))) throw err;
-          await current.scanner.start({facingMode:facing==='environment'?'user':'environment'},config,accept,()=>{});
+          const cameras = await Html5Qrcode.getCameras();
+          if(current.cancelled) return;
+          if(!cameras.length) throw new Error('NotFoundError: žádná kamera');
+          const preferred = cameras.find(c=>facing==='environment'?/back|rear|zadní|environment/i.test(c.label):/front|face|přední|user/i.test(c.label));
+          await current.scanner.start((preferred || cameras[0]).id,config,accept,()=>{});
         }
         current.running=true;
         if(!current.cancelled && !current.done) setStatus('ready');
